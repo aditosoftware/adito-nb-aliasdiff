@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+AutoUpdate-Show-In-Client: true
+OpenIDE-Module-Name: Experimental AliasDefinition Compare
+OpenIDE-Module-Display-Category: ADITO / Database
+OpenIDE-Module-Short-Description: This plugin provides experimental features to
+ improve the comparing workflow of AliasDefinitions inside ADITO projects

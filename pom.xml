@@ -1,0 +1,73 @@
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>de.adito.nbm</groupId>
+    <artifactId>plugin-parent</artifactId>
+    <version>1.1.0</version>
+  </parent>
+
+  <groupId>de.adito.aditoweb.nbm</groupId>
+  <artifactId>aliasdiff</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>nbm</packaging>
+
+  <properties>
+    <netbeans.version>RELEASE122</netbeans.version>
+  </properties>
+
+  <dependencies>
+
+
+    <!-- Unittests -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>5.7.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-inline</artifactId>
+      <version>3.9.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-junit-jupiter</artifactId>
+      <version>3.9.0</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Lombok for additional annotations -->
+    <dependency>
+      <groupId>de.adito.aditoweb</groupId>
+      <artifactId>adito-lombok-extended</artifactId>
+      <version>1.0.1</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Tests -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.0.0-M5</version>
+      </plugin>
+
+      <!-- NetBeans -->
+      <plugin>
+        <groupId>org.apache.netbeans.utilities</groupId>
+        <artifactId>nbm-maven-plugin</artifactId>
+        <version>4.7</version>
+        <extensions>true</extensions>
+        <configuration>
+          <requiresRestart>false</requiresRestart>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

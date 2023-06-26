@@ -1,0 +1,79 @@
+name: Java CI with Maven
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+          - os: ubuntu-latest
+          - os: windows-latest
+    steps:
+      - name: Setup / Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup / Maven
+        uses: stCarolas/setup-maven@v4
+        with:
+          maven-version: 3.6.3
+
+      - name: Setup / JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: 13
+
+      - name: settings.xml
+        uses: whelk-io/maven-settings-xml-action@v9
+        with:
+          servers: >
+            [{ 
+              "id": "default", 
+              "username": "${{ secrets.nexus_user }}", 
+              "password": "${{ secrets.nexus_password }}"
+            }, 
+            {
+              "id": "snapshots", 
+              "username": "${{ secrets.nexus_user }}", 
+              "password": "${{ secrets.nexus_password }}"
+            }]
+          repositories: >
+            [{ 
+              "id": "default", 
+              "name": "default", 
+              "url": "https://nexus.adito.cloud/repository/public/", 
+              "releases": { "enabled": "true" } 
+            }, 
+            { 
+              "id": "snapshots", 
+              "name": "snapshots", 
+              "url": "https://nexus.adito.cloud/repository/snapshots/", 
+              "snapshots": { "enabled": "true", "updatePolicy": "always" } 
+            }]
+          plugin_repositories: >
+            [{ 
+               "id": "default", 
+               "url": "https://nexus.adito.cloud/repository/public/", 
+               "releases": { "enabled": "true" }, 
+               "snapshots": { "enabled": "true", "updatePolicy": "always" } 
+            }]
+
+      - name: Restore Maven cache
+        uses: skjolber/maven-cache-github-action@v1
+        with:
+          step: restore
+
+      - name: Maven / Compile
+        run: mvn --batch-mode install -U -T 1C "-Dmaven.javadoc.skip=true"
+
+      - name: Maven / Integration Test
+        run: mvn --batch-mode test-compile failsafe:integration-test failsafe:verify
+
+      - name: Save Maven cache
+        uses: skjolber/maven-cache-github-action@v1
+        with:
+          step: save
