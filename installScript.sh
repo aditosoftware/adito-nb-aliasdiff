@@ -15,8 +15,8 @@
 jarFile="de-adito-aditoweb-nbm-aliasdiff.jar"
 # path to the jar file above, from the location of this script. Example of the git plugin (Note that the git plugin builds the nbm in a submodule,
 # path probably starts with target/...):
-# jarPath="nbm/target/nbm/netbeans/extra/modules/"
-jarPath="target/nbm/netbeans/extra/modules/"
+# jarPath="nbm/target/nbm/clusters/extra/modules/"
+jarPath="target/nbm/clusters/extra/modules/"
 # the path to the folder in which the jar should be moved. Example of the git plugin:
 # jarTargetPath="../0.0/workingdir/nbp_userdir/modules/"
 jarTargetPath="../designer/workingdir/nbp_userdir/modules/"
@@ -24,8 +24,8 @@ jarTargetPath="../designer/workingdir/nbp_userdir/modules/"
 # folderName="de.adito.git.adito-nbm-git/"
 folderName="de.adito.aditoweb.nbm.aliasdiff"
 # path to the folder containing the gathered dependencies, as seen from the location of the script. Example of the git plugin:
-# folderPath="nbm/target/nbm/netbeans/extra/modules/ext/"
-folderPath="target/nbm/netbeans/extra/modules/ext/"
+# folderPath="nbm/target/nbm/clusters/extra/modules/ext/"
+folderPath="target/nbm/clusters/extra/modules/ext/"
 
 if test -z "$jarFile" || test -z "$jarPath" || test -z "$jarTargetPath" || test -z "$folderName" || test -z "$folderPath"
 then
