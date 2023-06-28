@@ -41,7 +41,7 @@ folderTargetPath=$jarTargetPath$targetPathFolder
 mvn clean install -T 1C -P adito.m2
 
 cp $jarFilePath $jarFileTargetPath
-#cp -r $folderNamePath $folderTargetPath
+cp -r $folderNamePath $folderTargetPath
 
 fi
 

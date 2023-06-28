@@ -14,11 +14,101 @@
   <packaging>nbm</packaging>
 
   <properties>
+    <designer.version>6.2.0</designer.version>
     <netbeans.version>RELEASE122</netbeans.version>
   </properties>
 
-  <dependencies>
+  <dependencyManagement>
+    <dependencies>
+      <!-- NB-Adito-Interface for providing ADITO-Specific stuff -->
+      <dependency>
+        <groupId>de.adito.nb-modules</groupId>
+        <artifactId>nb-adito-interface</artifactId>
+        <version>[1.9.8]</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
+  <dependencies>
+    <!-- ADITO / Designer Packages -->
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>EntityDBEditor</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>EntityEditorCommon</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerDataObjects</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerCommonInterface</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerProperties</artifactId>
+      <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.eclipse.jdt.core.compiler</groupId>
+          <artifactId>ecj</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerDataBase</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>AditoNetBeansUtil</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>lwdatabase</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>lwsystem</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+
+    <!-- NetBeans -->
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-util-lookup</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-nodes</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-util-ui</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-util</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-modules</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
 
     <!-- Unittests -->
     <dependency>
@@ -38,6 +128,13 @@
       <artifactId>mockito-junit-jupiter</artifactId>
       <version>3.9.0</version>
       <scope>test</scope>
+    </dependency>
+
+    <!-- Propertly -->
+    <dependency>
+      <groupId>de.adito.propertly</groupId>
+      <artifactId>propertly.core</artifactId>
+      <version>1.0.9</version>
     </dependency>
 
     <!-- Lombok for additional annotations -->
@@ -65,6 +162,14 @@
         <extensions>true</extensions>
         <configuration>
           <requiresRestart>false</requiresRestart>
+          <useOSGiDependencies>true</useOSGiDependencies>
+          <moduleDependencies>
+            <dependency>
+              <id>de.adito.designer.netbeans:EntityDBEditor</id>
+              <type>impl</type>
+              <explicitValue>de.adito.designer.netbeans.EntityDBEditor > 6.2.0</explicitValue>
+            </dependency>
+          </moduleDependencies>
         </configuration>
       </plugin>
     </plugins>
