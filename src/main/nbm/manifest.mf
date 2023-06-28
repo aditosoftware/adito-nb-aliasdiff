@@ -4,3 +4,4 @@ OpenIDE-Module-Name: Experimental AliasDefinition Compare
 OpenIDE-Module-Display-Category: ADITO / Database
 OpenIDE-Module-Short-Description: This plugin provides experimental features to
  improve the comparing workflow of AliasDefinitions inside ADITO projects
+OpenIDE-Module-Install: de/adito/aditoweb/nbm/aliasdiff/AliasDiffModuleInstall.class
