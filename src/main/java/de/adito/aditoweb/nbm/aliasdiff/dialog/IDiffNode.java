@@ -1,90 +1,90 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.*;
-import org.jetbrains.annotations.*;
+import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffPresenter;
+import lombok.NonNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.tree.TreeNode;
 
 /**
- * Eine Implementierung kann im DiffPresenter dargestellt werden.
- * @see de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffPresenter
+ * An implementation of this node can be presented via {@link DiffPresenter}
+ *
  * @author T.Tasior, 27.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
+ * @see DiffPresenter
  */
 public interface IDiffNode extends TreeNode
 {
   /**
-   * Liefert true wenn das Datenmodell auf der angegebenen Seite nur
-   * gelesen werden kann
+   * Determines, if the data model is readonly on the given side
    *
-   * @param pDirection das linke oder rechte Datenmodell wird befragt.
-   * @return false wenn in das angegebene Datenmodell ein Wert geschrieben
-   * werden kann.
+   * @param pDirection side to check for readonly state
+   * @return true, if readonly
    */
-   boolean isReadOnly(@NotNull EDirection pDirection);
+  boolean isReadOnly(@NonNull EDirection pDirection);
 
   /**
-   * Liefert den Namen eines der beiden Datenmodelle.
+   * True, if the model on the given side is a remote one
    *
-   * @param pDirection das linke bzw. rechte Datenmodell wird befragt.
-   * @return normalerweise den Namen der im Designer für dieses Datenmodell
-   * präsentiert wird.
+   * @param pDirection side to check for remote state
+   * @return true, if the model is on a remote location
    */
-   String getRootName(EDirection pDirection);
+  boolean isRemote(@NonNull EDirection pDirection);
 
   /**
-   * Liefert true wenn das Datenmodell über einen Netzwerkzugriff
-   * angefordert wurde.
+   * Returns the name of the root on the given side
    *
-   * @param pDirection das linke oder rechte Datenmodell wird befragt.
-   * @return false, wenn das Datenmodell nicht über einen
-   * Netzwerkzugriff bereitgestellt wurde.
+   * @param pDirection side to get the name for
+   * @return Name of the root
    */
-   boolean isRemote(@NotNull EDirection pDirection);
+  @NonNull
+  String getRootName(@NonNull EDirection pDirection);
 
   /**
-   * Liefert die gesamte Anzahl an Differenzen in der Baumstruktur.
+   * Calculates the differences in the whole tree structure
    *
-   * @return Wert zwischen 0 und Integer.MAX_VALUE.
+   * @return Value between 0 and Integer.MAX_VALUE
    */
-   int countDifferences();
-
+  int countDifferences();
 
   /**
-   * Liefert eine AbstractPair Implementierung die Werte bzw
-   * Datenmodelle verwaltet.
-   *
-   * @return AbstractPair Implementierung dieses Nodes.
+   * @return the root pair to manage
    */
-   AbstractPair getPair();
+  @NonNull
+  AbstractPair getPair();
 
   /**
-   * Liefert einen String für die Anzeige in der GUI.
+   * Returns a string that can be displayed on gui
    *
-   * @param pDirection betrifft die linke oder rechte Seite.
-   * @return immer einen String.
+   * @param pDirection side to get the name for
+   * @return the displayable string for the given side
    */
-   String nameForDisplay(EDirection pDirection);
+  @Nullable
+  String nameForDisplay(@NonNull EDirection pDirection);
 
   /**
-   * Sammelt die Diff Stati von sich und seinen Kindern.
+   * Collects every single statuses, recursive
    *
-   * @param pParentCollector sammelt die Stati der einzelnen Knoten.
-   * @return den Kollektor mit den Stati dieses Teilbaums.
+   * @param pParentCollector the collector of the parent or null, if we are the root
+   * @return the collector with our states
    */
-   DiffStateCollector collectDiffStates(@Nullable DiffStateCollector pParentCollector);
+  @NonNull
+  DiffStateCollector collectDiffStates(@Nullable DiffStateCollector pParentCollector);
 
   /**
-   * Ermittelt die Art der Wertedifferenz für eine bestimmte Seite
+   * Calculcates the type of diff on the given side
    *
-   * @param pDir links, oder rechts.
-   * @return eine der EDiff Konstanten.
+   * @param pDirection side to get the diff type for
+   * @return the type
    */
-   EDiff getDiff(@NotNull EDirection pDir);
-   
-  /**
-   * Schreibt die geänderten Werte zurück ins Datenmodell.
-   */
-   void write();
+  @NonNull
+  EDiff getDiff(@NonNull EDirection pDirection);
 
-  
+  /**
+   * Writes the changed values back to the data models
+   */
+  void write();
+
+
 }

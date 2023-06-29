@@ -4,8 +4,10 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Wird als Renderer für den PropertyNode benutzt.
+ * Used as a renderer for the {@link de.adito.aditoweb.nbm.aliasdiff.dialog.PropertyNode}.
+ *
  * @author t.tasior, 07.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
  class CrippledLabel extends JLabel
 {
@@ -14,8 +16,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void validate()
   {
+    // performance
   }
 
   /**
@@ -25,8 +29,10 @@ import java.awt.*;
    *
    * @since 1.5
    */
+  @Override
   public void invalidate()
   {
+    // performance
   }
 
   /**
@@ -34,8 +40,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void revalidate()
   {
+    // performance
   }
 
   /**
@@ -43,8 +51,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void repaint(long tm, int x, int y, int width, int height)
   {
+    // performance
   }
 
   /**
@@ -52,8 +62,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void repaint(Rectangle r)
   {
+    // performance
   }
 
   /**
@@ -63,8 +75,10 @@ import java.awt.*;
    *
    * @since 1.5
    */
+  @Override
   public void repaint()
   {
+    // performance
   }
 
   /**
@@ -72,11 +86,12 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   protected void firePropertyChange(String propertyName, Object oldValue, Object newValue)
   {
-    // Strings get interned...
-    if (propertyName == "text"
-        || ((propertyName == "font" || propertyName == "foreground")
+    //noinspection StringEquality Strings get interned...
+    if (propertyName == "text" // NOSONAR
+        || ((propertyName == "font" || propertyName == "foreground") // NOSONAR
         && oldValue != newValue
         && getClientProperty(javax.swing.plaf.basic.BasicHTML.propertyKey) != null))
     {
@@ -90,8 +105,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, byte oldValue, byte newValue)
   {
+    // performance
   }
 
   /**
@@ -99,8 +116,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, char oldValue, char newValue)
   {
+    // performance
   }
 
   /**
@@ -108,8 +127,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, short oldValue, short newValue)
   {
+    // performance
   }
 
   /**
@@ -117,8 +138,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, int oldValue, int newValue)
   {
+    // performance
   }
 
   /**
@@ -126,8 +149,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, long oldValue, long newValue)
   {
+    // performance
   }
 
   /**
@@ -135,8 +160,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, float oldValue, float newValue)
   {
+    // performance
   }
 
   /**
@@ -144,8 +171,10 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, double oldValue, double newValue)
   {
+    // performance
   }
 
   /**
@@ -153,7 +182,9 @@ import java.awt.*;
    * See the <a href="#override">Implementation Note</a>
    * for more information.
    */
+  @Override
   public void firePropertyChange(String propertyName, boolean oldValue, boolean newValue)
   {
+    // performance
   }
 }

@@ -1,31 +1,25 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.propertly.core.spi.IProperty;
-import org.jetbrains.annotations.NotNull;
+
+import java.util.function.Predicate;
 
 /**
- * Eine Implementierung lässt nur Objekte durch die
- * zum Vergleich herangezogen werden dürfen.
+ * An implementation only allows objects through that may be used for comparison.
+ *
  * @author t.tasior, 31.01.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
-public interface IPropertyFilter
+public interface IPropertyFilter extends Predicate<IProperty<?, ?>>
 {
-  /**
-   * Liefert true, wenn das übergebene Property verglichen werden darf.
-   *
-   * @param pProperty wird überprüft ob es verglichen werden darf.
-   * @return true, wenn der Vergleich zulässig ist.
-   */
-  boolean canMatch(@NotNull IProperty<?, ?> pProperty);
 
   /**
-   * Wird vom PropertypitMatcher zweimal aufgerufen, vor jedem
-   * Datenmodell einmal. Einstellungen die für das erste Datenmodell
-   * vorgenommen wurden, können somit verworfen und für den zweiten Durchlauf
-   * neu konfiguriert werden.
+   * Called by the PropertypitMatcher twice, before each data model.
+   * Settings made for the first data model can thus be discarded and reconfigured for the second run.
    */
   default void reset()
   {
-    //tut nichts
+    // nothing by default
   }
+
 }

@@ -2,12 +2,14 @@ package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.EDiff;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffIcon;
+import lombok.NonNull;
 
 /**
- * Hilfsklasse zum sammeln der Diff Stati in den einzelnen Knoten.
- * Konfiguriert das Icon im Baum mit denn anzuzeigenden Farben.
+ * Helper class for collecting the diff statuses in each node.
+ * Configures the icon in the tree with the colors to be displayed.
  *
  * @author t.tasior, 09.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  * @see DiffIcon
  */
 public class DiffStateCollector
@@ -18,19 +20,19 @@ public class DiffStateCollector
   EDiff deleted;
 
   /**
-   * Liefert true wenn einer der Stati EDiff.EQUAL
-   * oder EDiff.DELETED gesetzt wurde.
+   * Returns true, if one of the statuses i EQUAL or DELETED
    */
   public boolean canRestore()
   {
-    return EDiff.EQUAL.equals(equal) | EDiff.DELETED.equals(deleted);
+    return EDiff.EQUAL.equals(equal) || EDiff.DELETED.equals(deleted);
   }
 
   /**
-   * Konfiguriert das Icon entsprechend der gesetzten Diff Stati.
-   * @param pIcon für die Anzeige im Baum.
+   * Updates the icon based on the current statuses
+   *
+   * @param pIcon the icon inside a tree
    */
-  public void update(DiffIcon pIcon)
+  public void update(@NonNull DiffIcon pIcon)
   {
     pIcon.reset();
     if (equal != null)
@@ -47,18 +49,14 @@ public class DiffStateCollector
   }
 
   /**
-   * Bringt den Kollektur in den initialen Zustand damit erneut
-   * Stati gesammelt werden können.
-   * @return sich selbst im Ursprungszustand.
+   * Resets every status inside, so it seems untouched afterwards
    */
-  public DiffStateCollector reset()
+  public void reset()
   {
     equal = null;
     different = null;
     missing = null;
     deleted = null;
-
-    return this;
   }
 
 

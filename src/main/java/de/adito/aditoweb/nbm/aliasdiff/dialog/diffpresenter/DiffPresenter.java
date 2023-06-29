@@ -5,17 +5,19 @@ import de.adito.aditoweb.core.util.lang.Pair;
 import de.adito.aditoweb.designer.dataobjects.data.miscobjects.AliasDefinitionDataObject;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
 import de.adito.aditoweb.nbm.aditonetbeansutil.notification.NotifyUtil;
+import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
+import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.EDiff;
 import de.adito.aditoweb.nbm.designer.commoninterface.lookup.editorcontext.IEditorContextProvider;
 import de.adito.aditoweb.nbm.designer.commoninterface.refactor.IReferenceManager;
 import de.adito.aditoweb.nbm.designer.commoninterface.services.editorcontext.*;
-import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
-import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.EDiff;
 import de.adito.aditoweb.system.crmcomponents.IDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.*;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.IEntityFieldDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
 import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasDefinitionDataModel;
-import org.jetbrains.annotations.*;
+import lombok.*;
+import lombok.extern.java.Log;
+import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.project.Project;
 import org.openide.*;
 import org.openide.util.NbBundle;
@@ -27,30 +29,34 @@ import java.awt.*;
 import java.awt.event.ActionListener;
 import java.util.List;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /**
- * Zeigt entweder einen Dialog mit dem Diffpanel an, oder eine Balloon Information.
+ * Displays either a dialog with the diffpanel, or a balloon information.
  *
  * @author t.tasior, 09.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
+@Log
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DiffPresenter
 {
   /**
-   * Nimmt die Baumstruktur entgegen und zeigt entweder eine Balloon Information
-   * wenn es keine Differenzen im Baum gibt, oder einen Dialog mit dem Diffpanel.
-   * Nimmt einen Listener entgegen der beim Klick auf "OK" im Dialog aufgerufen wird.
+   * Receives the tree structure and shows either a balloon information if there are no differences in the tree,
+   * or a dialog with the diffpanel. Accepts a listener that is called up in the dialog when you click on "OK".
    *
-   * @param pRoot               Baumstruktur die ggf. Differenzen enthält.
-   * @param pUpdateHandler      entscheidet welche Updates auf den Datenmodellen erlaubt sind.
-   * @param pListener           hört auf den Button "OK" im Dialog.
-   * @param pUserdefinedToolTip ein spezieller Tooltip für die Info Komponente rechts oben.
+   * @param pProject            Project for the current working context
+   * @param pRoot               Root Node that may contain differences
+   * @param pUpdateHandler      Determines which updates the tree will allow
+   * @param pListener           Listener that gets triggered, if OK was clicked
+   * @param pUserdefinedToolTip a tooltip to display
    */
-  public static void show(IDiffNode pRoot, IUpdateHandler pUpdateHandler, ActionListener pListener,
-                          JToolTip pUserdefinedToolTip, Project pProject)
+  public static void show(@NonNull Project pProject, @NonNull IDiffNode pRoot, @Nullable IUpdateHandler pUpdateHandler,
+                          @Nullable ActionListener pListener, @Nullable JToolTip pUserdefinedToolTip)
   {
-    String leftTitle = DiffPanel.getLeftTitle(pRoot);
-    String rightTitle = DiffPanel.getRightTitle(pRoot);
+    String leftTitle = DiffPanel.getTitle(pRoot, EDirection.LEFT);
+    String rightTitle = DiffPanel.getTitle(pRoot, EDirection.RIGHT);
     String title = NbBundle.getMessage(DiffPresenter.class, "LBL_Diff", leftTitle, rightTitle);
     if (pRoot.getChildCount() == 0)
     {
@@ -65,30 +71,30 @@ public class DiffPresenter
     final DialogDescriptor descriptor = new DialogDescriptor(new DiffPanel(pRoot, pUpdateHandler, pUserdefinedToolTip),
                                                              title, true, buttons, ok,
                                                              DialogDescriptor.BOTTOM_ALIGN, null, null);
-    descriptor.setClosingOptions(new Object[]{});//Den Dialog schliessen wir.
+    descriptor.setClosingOptions(new Object[]{});
 
     final Dialog dlg = DialogDisplayer.getDefault().createDialog(descriptor);
     descriptor.setButtonListener(e -> {
       if (e.getSource() == ok)
       {
-        IDataModel<?, ?> model = _findRootModel(pRoot, pProject);
+        AliasDefinitionDataModel model = findRootModel(pProject, pRoot);
         if (model != null)
         {
-          Pair<List<String>, List<Pair<String, List<String>>>> deleteCandidates = _extractDeleteCandidates(pRoot);
+          Pair<List<String>, List<Pair<String, List<String>>>> deleteCandidates = extractDeleteCandidates(pRoot);
           List<IDataModel<?, ?>> toDelete = new ArrayList<>();
-          // alle gelöschten Tabellen finden
+          // find all deleted tables
           deleteCandidates.a.stream()
-              .map(pTableName -> _findTable(pTableName, model))
+              .map(pTableName -> findTable(model, pTableName))
               .filter(Objects::nonNull)
               .forEach(toDelete::add);
 
-          // alle gelöschten Spalten finden
+          // find all deleted columns
           deleteCandidates.b.stream()
-              .map(pPair -> new Pair<>(_findTable(pPair.a, model), pPair.b))
+              .map(pPair -> new Pair<>(findTable(model, pPair.a), pPair.b))
               .filter(pPair -> pPair.a != null)
               .map(pPair -> pPair.b
                   .stream()
-                  .map(pString -> _findColumn(pString, pPair.a))
+                  .map(pString -> findColumn(pPair.a, pString))
                   .filter(Objects::nonNull)
                   .collect(Collectors.toList()))
               .forEach(toDelete::addAll);
@@ -115,35 +121,15 @@ public class DiffPresenter
   }
 
   /**
-   * Liefert die Position des Datenmodells das lokal auf der Platte (im Projekt) ist
-   * und editiert werden kann.
+   * Extracts all deleted tables and columns
    *
-   * @param pRoot wird nach den o.g. Eigenschaften befragt.
-   * @return eine der beiden Konstanten, oder null.
+   * @param pRoot Root to search for
+   * @return List with all deleted tables and a list of pairs containing the deleted column and the table name
    */
-  private static EDirection _getDirectionOfLocalReadableModel(IDiffNode pRoot)
+  @NonNull
+  private static Pair<List<String>, List<Pair<String, List<String>>>> extractDeleteCandidates(@NonNull IDiffNode pRoot)
   {
-    EDirection left = EDirection.LEFT;
-    EDirection right = EDirection.RIGHT;
-
-    if (!pRoot.isRemote(left) && !pRoot.isReadOnly(left))
-      return left;
-    else if (!pRoot.isRemote(right) && !pRoot.isReadOnly(right))
-      return right;
-
-    return null;
-  }
-
-  /**
-   * Findet alle gelöschten Tabellen und Spalten
-   *
-   * @param pRoot der Root-Node des Diffs
-   * @return Liste mit allen gelöschten Tabellen und eine Liste von Pairs mit den gelöschten Spalten und der dazugehörige Tabellenname.
-   */
-  @NotNull
-  private static Pair<List<String>, List<Pair<String, List<String>>>> _extractDeleteCandidates(@NotNull IDiffNode pRoot)
-  {
-    EDirection direction = _getDirectionOfLocalReadableModel(pRoot);
+    EDirection direction = getDirectionOfLocalReadableModel(pRoot);
 
     if (direction != null)
     {
@@ -161,10 +147,8 @@ public class DiffPresenter
         for (TreeNode column : Collections.list(node.children()))
         {
           IDiffNode child = (IDiffNode) column;
-          if (child.getDiff(direction) == EDiff.DELETED)//Eine Spalte soll gelöscht werden.
-          {
+          if (child.getDiff(direction) == EDiff.DELETED)// column should be deleted
             deletedColumns.add(((DefaultMutableTreeNode) child).getUserObject().toString());
-          }
         }
         if (!deletedColumns.isEmpty())
           columns.add(new Pair<>(tableName, deletedColumns));
@@ -175,41 +159,59 @@ public class DiffPresenter
     return new Pair<>(List.of(), List.of());
   }
 
+  /**
+   * Searches a table with the given name in the given alias
+   *
+   * @param pAlias Alias to search in
+   * @param pName  Name of the table that should be returned
+   * @return the found table or null, if not found
+   */
   @Nullable
-  private static EntityDBDataModel _findTable(@NotNull String pName, @NotNull IDataModel<?, ?> pAlias)
+  private static EntityDBDataModel findTable(@NonNull AliasDefinitionDataModel pAlias, @NonNull String pName)
   {
-    if (pAlias instanceof AliasDefinitionDataModel)
+    //noinspection unchecked
+    AliasDefinitionDataObject aliasDefinitionDataObject = (AliasDefinitionDataObject) DataObjectUtil.get(pAlias);
+    AbstractAliasDefSubDataModel<?> subdm = aliasDefinitionDataObject.observeSubModel().blockingFirst().orElse(null);
+    if (subdm instanceof AliasDefDBDataModel)
     {
-      //noinspection unchecked
-      AliasDefinitionDataObject aliasDefinitionDataObject = (AliasDefinitionDataObject) DataObjectUtil.get(pAlias);
-      AbstractAliasDefSubDataModel<?> subdm = aliasDefinitionDataObject.observeSubModel().blockingFirst().orElse(null);
-      if (subdm instanceof AliasDefDBDataModel)
+      EntityGroupDBDataModel entityGroup = ((AliasDefDBDataModel) subdm).getValue(AliasDefDBDataModel.entityGroup);
+      if (entityGroup != null)
       {
-        EntityGroupDBDataModel entityGroup = ((AliasDefDBDataModel) subdm).getValue(AliasDefDBDataModel.entityGroup);
-        if (entityGroup != null)
-        {
-          List<EntityDBDataModel> result = entityGroup.getEntities().stream().filter(pEntityDBDataModel -> pEntityDBDataModel.getName().equals(pName)).collect(Collectors.toList());
-          if (result.size() == 1)
-            return result.get(0);
-        }
+        List<EntityDBDataModel> result = entityGroup.getEntities().stream()
+            .filter(pEntityDBDataModel -> pEntityDBDataModel.getName().equals(pName))
+            .collect(Collectors.toList());
+        if (result.size() == 1)
+          return result.get(0);
       }
     }
+
     return null;
   }
 
+  /**
+   * Searches a column within the given table
+   *
+   * @param pTable      Table to search in
+   * @param pNameColumn Name of the column to search
+   * @return the found column or null, if not found
+   */
   @Nullable
-  private static IEntityFieldDataModel<?> _findColumn(@Nullable String pNameColumn, @NotNull EntityDBDataModel pTable)
+  private static IEntityFieldDataModel<?> findColumn(@NonNull EntityDBDataModel pTable, @Nullable String pNameColumn)
   {
-    List<IEntityFieldDataModel<?>> result = pTable.getChildren().stream().filter(pField -> pField.getName().equals(pNameColumn)).collect(Collectors.toList());
-    if (result.size() == 1)
-      return result.get(0);
-
-    return null;
+    return pTable.getEntityField(pNameColumn);
   }
 
-  private static IDataModel<?, ?> _findRootModel(IDiffNode pRoot, Project pProject)
+  /**
+   * Searches the alias definition that the given diff node represents
+   *
+   * @param pProject Project to determine the definitions from
+   * @param pRoot    Root to search
+   * @return the found model or null, if nothing found
+   */
+  @Nullable
+  private static AliasDefinitionDataModel findRootModel(@NonNull Project pProject, @NonNull IDiffNode pRoot)
   {
-    EDirection direction = _getDirectionOfLocalReadableModel(pRoot);
+    EDirection direction = getDirectionOfLocalReadableModel(pRoot);
     if (direction != null)
     {
       IEditorContextProvider p = EditorContextProviderQuery.find(pProject);
@@ -217,9 +219,39 @@ public class DiffPresenter
       {
         IEditorContext<?> ec = p.find(pRoot.getRootName(direction));
         if (ec != null)
-          return ec.getModelRootAsProperty().getValue();
+        {
+          try
+          {
+            return (AliasDefinitionDataModel) ec.getModelRoot();
+          }
+          catch (WrongDataModelException e)
+          {
+            log.log(Level.WARNING, "", e);
+          }
+        }
       }
     }
+
+    return null;
+  }
+
+  /**
+   * Returns the position of the data model, which is local on disk (in the project) and can be edited.
+   *
+   * @param pRoot necessary to determine
+   * @return the direction or null, if not calculatable
+   */
+  @Nullable
+  private static EDirection getDirectionOfLocalReadableModel(@NonNull IDiffNode pRoot)
+  {
+    EDirection left = EDirection.LEFT;
+    EDirection right = EDirection.RIGHT;
+
+    if (!pRoot.isRemote(left) && !pRoot.isReadOnly(left))
+      return left;
+    else if (!pRoot.isRemote(right) && !pRoot.isReadOnly(right))
+      return right;
+
     return null;
   }
 }

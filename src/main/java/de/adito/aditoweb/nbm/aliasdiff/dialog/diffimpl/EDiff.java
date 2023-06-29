@@ -3,9 +3,11 @@ package de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.EDirection;
 
 /**
- * Enthält die verschiedenen Diff Zustände.
- * @see AbstractPair#typeOfDiff(EDirection) 
+ * Contains all states of a diff
+ *
  * @author t.tasior, 13.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
+ * @see AbstractPair#typeOfDiff(EDirection)
  */
 public enum EDiff
 {

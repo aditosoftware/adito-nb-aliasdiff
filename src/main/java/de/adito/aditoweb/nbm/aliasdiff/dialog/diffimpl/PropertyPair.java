@@ -4,65 +4,53 @@ import de.adito.aditoweb.filesystem.propertly.*;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
 import de.adito.propertly.core.common.path.PropertyPath;
 import de.adito.propertly.core.spi.*;
-import org.jetbrains.annotations.NotNull;
+import lombok.NonNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 
+ * Implementation of {@link AbstractPair} that is based on a single property
+ *
  * @author t.tasior, 07.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
 public class PropertyPair extends AbstractPair
 {
-  private PropertyRestoreHandler handler;
   private RestoreHandler restoreHandler = null;
-  private IProperty leftProperty;
-  private IProperty rightProperty;
-  //Wir brauchen den Namen zum Wiederherstellen wenn beide Properties null sind.
+  private IProperty<?, ?> leftProperty;
+  private IProperty<?, ?> rightProperty;
   private String name;
 
-  public PropertyPair(PropertyNode pHost)
+  public PropertyPair(@NonNull PropertyNode pHost)
   {
     super(pHost);
-    handler = new PropertyRestoreHandler();
   }
-
-  public void setProperty(@NotNull EDirection pDirection, IProperty pProperty)
-  {
-    if ((pProperty != null) & (name == null))
-      name = pProperty.getName();
-
-    switch (pDirection)
-    {
-      case LEFT:
-        leftProperty = pProperty;
-        break;
-
-      case RIGHT:
-        rightProperty = pProperty;
-        break;
-    }
-  }
-
-  public boolean containsProperty(@NotNull IProperty pProp)
-  {
-    if ((leftProperty != null) && leftProperty.getName().equals(pProp.getName()))
-      return true;
-
-    if ((rightProperty != null) && rightProperty.getName().equals(pProp.getName()))
-      return true;
-
-    return false;
-  }
-
 
   @Override
-  public Object getManagedObject(@NotNull EDirection pDirection)
+  public void setProperty(@NonNull EDirection pDirection, @Nullable IProperty<?, ?> pProperty)
+  {
+    if (pProperty != null && name == null)
+      name = pProperty.getName();
+
+    if (pDirection == EDirection.LEFT)
+      leftProperty = pProperty;
+    else if (pDirection == EDirection.RIGHT)
+      rightProperty = pProperty;
+  }
+
+  @Override
+  public boolean containsProperty(@NonNull IProperty<?, ?> pProp)
+  {
+    return (leftProperty != null && leftProperty.getName().equals(pProp.getName())) ||
+        (rightProperty != null && rightProperty.getName().equals(pProp.getName()));
+  }
+
+  @Override
+  public Object getManagedObject(@NonNull EDirection pDirection)
   {
     if (pDirection == EDirection.LEFT)
       return leftProperty;
-
 
     if (pDirection == EDirection.RIGHT)
       return rightProperty;
@@ -70,57 +58,33 @@ public class PropertyPair extends AbstractPair
     return null;
   }
 
-
   @Override
   public boolean isEqual()
   {
-    if ((leftProperty == null) & (rightProperty == null))
+    if (leftProperty == null && rightProperty == null)
       return true;
 
-    if ((leftProperty != null) & (rightProperty == null))
-      return false;
-
-    if ((leftProperty == null) & (rightProperty != null))
+    if (leftProperty == null || rightProperty == null)
       return false;
 
     if (Objects.equals(leftProperty.getValue(), rightProperty.getValue()))
       return true;
 
-    IHierarchy rightHierarchy = ((BulkModifyHierarchy) rightProperty.getHierarchy()).getSourceHierarchy();
-    boolean rightIsDefaultOrNull;
-    if (rightHierarchy instanceof DataModelHierarchy)
-      rightIsDefaultOrNull = DataModelHierarchy.isDefaultValue(new PropertyPath(rightProperty).find(rightHierarchy));
-    else
-      rightIsDefaultOrNull = rightProperty.getValue() == null;
-
-    IHierarchy leftHierarchy = ((BulkModifyHierarchy) leftProperty.getHierarchy()).getSourceHierarchy();
-    boolean leftIsDefaultOrNull;
-    if (leftHierarchy instanceof DataModelHierarchy)
-      leftIsDefaultOrNull = DataModelHierarchy.isDefaultValue(new PropertyPath(leftProperty).find(leftHierarchy));
-    else
-      leftIsDefaultOrNull = leftProperty.getValue() == null;
-
-    if (rightIsDefaultOrNull && leftIsDefaultOrNull)
-      return true;
-
-    return false;
+    return isDefaultOrNull(leftProperty) && isDefaultOrNull(rightProperty);
   }
 
-
+  @NonNull
   @Override
-  public EDiff typeOfDiff(@NotNull EDirection pDirection)
+  public EDiff typeOfDiff(@NonNull EDirection pDirection)
   {
-    //Eines der beiden Properties wurde gelöscht
-    if ((leftProperty == null) & (rightProperty == null))
+    if (leftProperty == null && rightProperty == null)
       return EDiff.DELETED;
 
-    if ((pDirection == EDirection.LEFT) & (leftProperty == null))
+    if ((pDirection == EDirection.LEFT && leftProperty == null) ||
+        (pDirection == EDirection.RIGHT && rightProperty == null))
       return EDiff.MISSING;
 
-    if ((pDirection == EDirection.RIGHT) & (rightProperty == null))
-      return EDiff.MISSING;
-
-    if ((leftProperty != null) & (rightProperty != null))
+    if (leftProperty != null && rightProperty != null)
     {
       if (Objects.equals(leftProperty.getValue(), rightProperty.getValue()))
         return EDiff.EQUAL;
@@ -131,20 +95,20 @@ public class PropertyPair extends AbstractPair
     return EDiff.NOT_EVALUATED;
   }
 
-
   @Override
-  public void createDown(@NotNull EDirection pDirection, IPropertyPitProvider pParent)
+  public void createDown(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pParent)
   {
-    if ((pDirection == EDirection.RIGHT) & (leftProperty != null))
+    if (pDirection == EDirection.RIGHT && leftProperty != null)
     {
       if (rightProperty != null)
       {
-        handler.storeValue(pDirection, rightProperty.getValue());
-        rightProperty.setValue(leftProperty.getValue());
+        //noinspection unchecked,rawtypes
+        ((IProperty) rightProperty).setValue(leftProperty.getValue());
       }
       else
       {
-        pParent.getPit().setValue(leftProperty.getDescription(), leftProperty.getValue());
+        //noinspection unchecked,rawtypes
+        ((IPropertyPitProvider) Objects.requireNonNull(pParent)).getPit().setValue(leftProperty.getDescription(), leftProperty.getValue());
         rightProperty = pParent.getPit().findProperty(leftProperty.getDescription());
       }
     }
@@ -153,18 +117,19 @@ public class PropertyPair extends AbstractPair
     {
       if (leftProperty != null)
       {
-        handler.storeValue(pDirection, leftProperty.getValue());
-        leftProperty.setValue(rightProperty.getValue());
+        //noinspection unchecked,rawtypes
+        ((IProperty) leftProperty).setValue(rightProperty.getValue());
       }
       else
       {
-        pParent.getPit().setValue(rightProperty.getDescription(), rightProperty.getValue());
+        //noinspection unchecked,rawtypes
+        ((IPropertyPitProvider) Objects.requireNonNull(pParent)).getPit().setValue(rightProperty.getDescription(), rightProperty.getValue());
         leftProperty = pParent.getPit().findProperty(rightProperty.getDescription());
       }
     }
 
-    //Wiederherstellen eines Properties nachdem es gelöscht wurde.
-    if ((leftProperty == null) & (rightProperty == null))
+    // Restore a property after it has been deleted.
+    if (leftProperty == null && rightProperty == null && pParent != null)
     {
       if (pDirection == EDirection.LEFT)
         leftProperty = pParent.getPit().findProperty(name);
@@ -176,79 +141,53 @@ public class PropertyPair extends AbstractPair
   }
 
   @Override
-  public void deleteDown(@NotNull EDirection pDirection)
+  public void deleteDown(@NonNull EDirection pDirection)
   {
     if (pDirection == EDirection.LEFT)
-    {
       leftProperty = null;
-    }
 
     if (pDirection == EDirection.RIGHT)
-    {
       rightProperty = null;
-    }
   }
 
+  @Nullable
   @Override
-  protected void create(@NotNull EDirection pDirection,  AtomicReference pRef)
+  protected IPropertyPitProvider<?, ?, ?> create(@NonNull EDirection pDirection)
   {
-     //tut nichts
+    // not needed, because we are in a Property-Pair, not in a Provider-Pair
+    return null;
   }
 
-
+  @NonNull
   @Override
   public String nameForIdentification()
   {
     return name;
   }
 
-
+  @Nullable
   @Override
-  public String nameForDisplay(@NotNull EDirection pDirection)
+  public String nameForDisplay(@NonNull EDirection pDirection)
   {
-
     if (pDirection == EDirection.LEFT)
-    {
-      if (leftProperty != null && leftProperty.isValid())
-        return leftProperty.getName() + " = " + leftProperty.getValue();
-
-      return name;
-    }
+      return nameForDisplay(leftProperty, name);
 
     if (pDirection == EDirection.RIGHT)
-    {
-      if (rightProperty != null && rightProperty.isValid())
-        return rightProperty.getName() + " = " + rightProperty.getValue();
-
-      return name;
-    }
+      return nameForDisplay(rightProperty, name);
 
     return name;
-  }
-
-  public String nameForDebugPrint()
-  {
-    String leftPart = EDirection.LEFT.name() + " ____ ";
-    if (leftProperty != null)
-      leftPart = EDirection.LEFT.name() + " " + leftProperty.getName() + " " + leftProperty.getValue();
-
-    String rightPart = EDirection.RIGHT.name() + " ____ ";
-    if (rightProperty != null)
-      rightPart = EDirection.RIGHT.name() + " " + rightProperty.getName() + " " + rightProperty.getValue();
-
-    return leftPart + "   " + rightPart;
   }
 
   @Override
   public String toString()
   {
-    return nameForDisplay(EDirection.LEFT);//getName() + " Pair ";
+    return nameForDisplay(EDirection.LEFT);
   }
 
   @Override
-  public void update(@NotNull EDirection pDirection)
+  public void update(@NonNull EDirection pDirection)
   {
-    //solange der alte Wert nicht restored wurde, kann kein neuer gesetzt werden.
+    // as long as the old value has not been restored, no new one can be set.
     if (restoreHandler != null)
       return;
 
@@ -257,58 +196,59 @@ public class PropertyPair extends AbstractPair
       if (rightProperty == null)
       {
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(leftProperty);
+        restoreHandler.setModel(leftProperty);
         getHost().parent().getPair().update(pDirection);
         leftProperty = null;
       }
       else
       {
-        if (leftProperty != null)//Wert übernehmen links
+        if (leftProperty != null)
         {
           restoreHandler = new RestoreHandler(pDirection);
           restoreHandler.setValue(leftProperty.getValue());
-          leftProperty.setValue(rightProperty.getValue());
+
+          //noinspection unchecked,rawtypes
+          ((IProperty) leftProperty).setValue(rightProperty.getValue());
         }
         else
         {
           restoreHandler = new RestoreHandler(pDirection);
-          restoreHandler.setPropertly(null);//leftProperty ist null
-          AtomicReference<Object> ref = new AtomicReference<>();
-          getHost().parent().getPair().create(pDirection, ref);
-          Object o = ref.get();
-//Wert vom Parent holen
-          leftProperty = ((IPropertyPitProvider) o).getPit().getProperty(rightProperty.getDescription());
+          restoreHandler.setModel(null);
+          IPropertyPitProvider<?, ?, ?> o = getHost().parent().getPair().create(pDirection);
+
+          //noinspection unchecked,rawtypes
+          leftProperty = ((IPropertyPitProvider) Objects.requireNonNull(o)).getPit().getProperty(rightProperty.getDescription());
           getHost().parent().postUpdateDown(pDirection);
         }
       }
     }
-
-    if (pDirection == EDirection.RIGHT)
+    else if (pDirection == EDirection.RIGHT)
     {
-      if (leftProperty == null)//delete rechts
+      if (leftProperty == null)
       {
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(rightProperty);
+        restoreHandler.setModel(rightProperty);
         getHost().parent().getPair().update(pDirection);
         rightProperty = null;
       }
       else
       {
-        if (rightProperty != null)//Wert übernehmen rechts
+        if (rightProperty != null)
         {
           restoreHandler = new RestoreHandler(pDirection);
           restoreHandler.setValue(rightProperty.getValue());
-          rightProperty.setValue(leftProperty.getValue());
+
+          //noinspection unchecked,rawtypes
+          ((IProperty) rightProperty).setValue(leftProperty.getValue());
         }
         else
         {
           restoreHandler = new RestoreHandler(pDirection);
-          restoreHandler.setPropertly(null);//rightProperty ist null
-          AtomicReference<Object> ref = new AtomicReference<>();
-          getHost().parent().getPair().create(pDirection, ref);
-          Object o = ref.get();
-//Wert vom Parent holen
-          rightProperty = ((IPropertyPitProvider) o).getPit().getProperty(leftProperty.getDescription());
+          restoreHandler.setModel(null);
+          IPropertyPitProvider<?, ?, ?> o = getHost().parent().getPair().create(pDirection);
+
+          //noinspection unchecked,rawtypes
+          rightProperty = ((IPropertyPitProvider) Objects.requireNonNull(o)).getPit().getProperty(leftProperty.getDescription());
           getHost().parent().postUpdateDown(pDirection);
 
         }
@@ -318,73 +258,89 @@ public class PropertyPair extends AbstractPair
   }
 
   @Override
-  public void restore()
+  public void restore() //NOSONAR I won't refactor this, because something will break for sure..
   {
     if (restoreHandler != null)
     {
       EDirection direction = restoreHandler.getDirection();
-      Object propertly =  restoreHandler.getPropertly();
+      Object propertly = restoreHandler.getModel();
       Object value = restoreHandler.getValue();
 
-      if (direction == EDirection.LEFT)//Links wiederherstellen
+      if (direction == EDirection.LEFT)
       {
-        if (leftProperty != null & RestoreHandler.isSet(value))
-          leftProperty.setValue(value);
-        else if (leftProperty != null & RestoreHandler.isSet(propertly))
+        if (leftProperty != null && RestoreHandler.isSet(value))
+          //noinspection unchecked,rawtypes
+          ((IProperty) leftProperty).setValue(value);
+        else if (leftProperty != null && RestoreHandler.isSet(propertly))
         {
           restoreHandler = null;
           leftProperty = null;
           getHost().parent().getPair().restore();
-
         }
-        else if (leftProperty == null & RestoreHandler.isSet(propertly))//Property wieder aktivieren
+        else if (leftProperty == null && RestoreHandler.isSet(propertly))
         {
-          IPropertyPitProvider prov = (IPropertyPitProvider) getHost().parent().getPair().getManagedObject(direction);
+          //noinspection rawtypes
+          IPropertyPitProvider<?, ?, ?> prov = (IPropertyPitProvider) getHost().parent().getPair().getManagedObject(direction);
           if (prov != null)
-          {
             leftProperty = prov.getPit().findProperty(name);
-            restoreHandler = null;
-          }
           else
-          {
             getHost().parent().getPair().restore();
-            restoreHandler = null;
-          }
-
         }
       }
-      restoreHandler = null;
-
-      if (direction == EDirection.RIGHT)//Rechts wiederherstellen
+      else if (direction == EDirection.RIGHT)
       {
-        if (rightProperty != null & RestoreHandler.isSet(value))
-          rightProperty.setValue(value);
-        else if (rightProperty != null & RestoreHandler.isSet(propertly))
+        if (rightProperty != null && RestoreHandler.isSet(value))
+          //noinspection unchecked,rawtypes
+          ((IProperty) rightProperty).setValue(value);
+        else if (rightProperty != null && RestoreHandler.isSet(propertly))
         {
           restoreHandler = null;
           rightProperty = null;
           getHost().parent().getPair().restore();
-
         }
-        else if (rightProperty == null & RestoreHandler.isSet(propertly))//Property wieder aktivieren
+        else if (rightProperty == null && RestoreHandler.isSet(propertly))
         {
-          IPropertyPitProvider prov = (IPropertyPitProvider) getHost().parent().getPair().getManagedObject(direction);
+          //noinspection rawtypes
+          IPropertyPitProvider<?, ?, ?> prov = (IPropertyPitProvider) getHost().parent().getPair().getManagedObject(direction);
           if (prov != null)
-          {
             rightProperty = prov.getPit().findProperty(name);
-            restoreHandler = null;
-          }
           else
-          {
             getHost().parent().getPair().restore();
-            restoreHandler = null;
-          }
-          
         }
       }
+
       restoreHandler = null;
     }
-    
+  }
+
+  /**
+   * Determines, if the given property is in its default state or has a null value
+   *
+   * @param pProperty Property that should be checked
+   * @return true, if it is default or has a null value
+   */
+  private boolean isDefaultOrNull(@NonNull IProperty<?, ?> pProperty)
+  {
+    IHierarchy<?> rightHierarchy = ((BulkModifyHierarchy<?>) pProperty.getHierarchy()).getSourceHierarchy();
+    if (rightHierarchy instanceof DataModelHierarchy)
+      return DataModelHierarchy.isDefaultValue(Objects.requireNonNull(new PropertyPath(pProperty).find(rightHierarchy)));
+    else
+      return rightProperty.getValue() == null;
+  }
+
+  /**
+   * Returns a readable string to display the property on GUI elements
+   *
+   * @param pProperty Property to get the name for
+   * @param pFallback Fallback, if the property is null or invalid
+   * @return a name to display
+   */
+  @Nullable
+  private String nameForDisplay(@Nullable IProperty<?, ?> pProperty, @Nullable String pFallback)
+  {
+    if (pProperty != null && pProperty.isValid())
+      return pProperty.getName() + " = " + pProperty.getValue();
+    return pFallback;
   }
 
 }
