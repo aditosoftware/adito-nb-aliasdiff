@@ -1,97 +1,113 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter;
 
+import de.adito.aditoweb.nbm.aliasdiff.dialog.PropertyNode;
+
 import javax.swing.*;
 import java.awt.*;
 
 /**
- * Symbolisiert farblich die Wertunterschiede eines PropertyNode.
+ * Symbolizes the value differences of a {@link PropertyNode} in color.
  *
  * @author t.tasior, 07.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
 public class DiffIcon implements Icon
 {
-  private static final int y = 2;
-  private static final int w = 7;
-  private static final int h = 17;
-  private static final int width = w * 4;
-  private static final int height = 21;
+  private static final int Y = 2;
+  private static final int W = 7;
+  private static final int H = 17;
+  private static final int WIDTH = W * 4;
+  private static final int HEIGHT = 21;
 
-  public Color equal_Color;
-  public Color different_Color;
-  public Color missing_Color;
-  public Color deleted_Color;
-
-
-  public void reset()
-  {
-    equal_Color = null;
-    different_Color = null;
-    missing_Color = null;
-    deleted_Color = null;
-  }
+  private Color equalColor;
+  private Color differentColor;
+  private Color missingColor;
+  private Color deletedColor;
 
   @Override
   public void paintIcon(Component c, Graphics g, int pX, int pY)
   {
-
-    int _x = 0;
-    if (deleted_Color != null)
+    int currX = 0;
+    if (deletedColor != null)
     {
-      g.setColor(deleted_Color);
-      g.fillRect(_x, y, w, h);
+      g.setColor(deletedColor);
+      g.fillRect(currX, Y, W, H);
     }
 
-    _x += w;
-    if (missing_Color != null)
+    currX += W;
+    if (missingColor != null)
     {
-      g.setColor(missing_Color);
-      g.fillRect(_x, y, w, h);
+      g.setColor(missingColor);
+      g.fillRect(currX, Y, W, H);
     }
 
-    _x += w;
-    if (different_Color != null)
+    currX += W;
+    if (differentColor != null)
     {
-      g.setColor(different_Color);
-      g.fillRect(_x, y, w, h);
+      g.setColor(differentColor);
+      g.fillRect(currX, Y, W, H);
     }
 
-    _x += w;
-    if (equal_Color != null)
+    currX += W;
+    if (equalColor != null)
     {
-      g.setColor(equal_Color);
-      g.fillRect(_x, y, w, h);
+      g.setColor(equalColor);
+      g.fillRect(currX, Y, W, H);
     }
-  }
-
-  public void setEqualColor()
-  {
-    equal_Color = DiffColors.EQUAL;
-  }
-
-  public void setDifferentColor()
-  {
-    different_Color = DiffColors.DIFFERENT;
-  }
-
-  public void setMissingColor()
-  {
-    missing_Color = DiffColors.MISSING;
-  }
-
-  public void setDeletedColor()
-  {
-    deleted_Color = DiffColors.DELETED;
   }
 
   @Override
   public int getIconWidth()
   {
-    return width;
+    return WIDTH;
   }
 
   @Override
   public int getIconHeight()
   {
-    return height;
+    return HEIGHT;
+  }
+
+  /**
+   * Resets all currently set states
+   */
+  public void reset()
+  {
+    equalColor = null;
+    differentColor = null;
+    missingColor = null;
+    deletedColor = null;
+  }
+
+  /**
+   * Sets, that the icon should display an EQUAL state
+   */
+  public void setEqualColor()
+  {
+    equalColor = DiffColors.EQUAL;
+  }
+
+  /**
+   * Sets, that the icon should display a DIFFERENT state
+   */
+  public void setDifferentColor()
+  {
+    differentColor = DiffColors.DIFFERENT;
+  }
+
+  /**
+   * Sets, that the icon should display a MISSING state
+   */
+  public void setMissingColor()
+  {
+    missingColor = DiffColors.MISSING;
+  }
+
+  /**
+   * Sets, that the icon should display a DELETED state
+   */
+  public void setDeletedColor()
+  {
+    deletedColor = DiffColors.DELETED;
   }
 }

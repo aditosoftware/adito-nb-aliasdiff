@@ -1,59 +1,58 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
-import de.adito.aditoweb.system.crmcomponents.IDataModel;
+import de.adito.aditoweb.system.crmcomponents.*;
 import de.adito.propertly.core.api.Hierarchy;
 import de.adito.propertly.core.spi.*;
 import de.adito.propertly.core.spi.extension.AbstractIndexedMutablePPP;
-import org.jetbrains.annotations.NotNull;
+import lombok.NonNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.concurrent.atomic.AtomicReference;
-
+import java.util.Objects;
 
 /**
+ * Implementation of {@link AbstractPair} that is based on an {@link IPropertyPitProvider}
+ *
  * @author t.tasior, 07.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
 public class ProviderPair extends AbstractPair
 {
   private boolean bothPresent = false;
-  private IPropertyPitProvider leftProvider;
-  private IPropertyPitProvider rightProvider;
+  private IPropertyPitProvider<?, ?, ?> leftProvider;
+  private IPropertyPitProvider<?, ?, ?> rightProvider;
   private String name = null;
-
-  private ProviderRestoreHandler handler = null;
   private RestoreHandler restoreHandler = null;
 
-  public ProviderPair(PropertyNode pHost)
+  public ProviderPair(@NonNull PropertyNode pHost)
   {
     super(pHost);
   }
 
-  public void setProvider(@NotNull EDirection pDirection, IPropertyPitProvider pProvider)
+  @Override
+  public void setProvider(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pProvider)
   {
-    if ((pProvider != null) & (name == null))
+    if (pProvider != null && name == null)
     {
-      IProperty ownProp = pProvider.getPit().getOwnProperty();
+      IProperty<?, ?> ownProp = pProvider.getPit().getOwnProperty();
       Object value = ownProp.getValue();
-      if (value instanceof IDataModel)
-        name = ((IDataModel) value).getName();
+      if (value instanceof IDataModel<?, ?>)
+        name = ((IDataModel<?, ?>) value).getName();
 
       name = ownProp.getName();
     }
-    switch (pDirection)
-    {
-      case LEFT:
-        leftProvider = pProvider;
-        break;
 
-      case RIGHT:
-        rightProvider = pProvider;
-        break;
-    }
-    bothPresent = (leftProvider != null) & (rightProvider != null);
+    if (pDirection == EDirection.LEFT)
+      leftProvider = pProvider;
+    else if (pDirection == EDirection.RIGHT)
+      rightProvider = pProvider;
+
+    bothPresent = leftProvider != null && rightProvider != null;
   }
 
+  @Nullable
   @Override
-  public Object getManagedObject(@NotNull EDirection pDirection)
+  public Object getManagedObject(@NonNull EDirection pDirection)
   {
     if (pDirection == EDirection.LEFT)
       return leftProvider;
@@ -64,31 +63,23 @@ public class ProviderPair extends AbstractPair
     return null;
   }
 
-
-  private boolean _emptyAndNull()
-  {
-    if ((leftProvider != null) & (rightProvider != null))
-      return false;
-
-    return false;
-  }
-
+  @NonNull
   @Override
-  public EDiff typeOfDiff(@NotNull EDirection pDirection)
+  public EDiff typeOfDiff(@NonNull EDirection pDirection)
   {
-    if (bothPresent | _emptyAndNull())
+    if (bothPresent)
       return EDiff.BOTH_PRESENT;
 
-    if (((leftProvider != null) & (rightProvider != null)))//isValueApplied() & 
+    if ((leftProvider != null && rightProvider != null))
       return EDiff.EQUAL;
 
-    if ((leftProvider == null) & (rightProvider == null))
+    if (leftProvider == null && rightProvider == null)
       return EDiff.DELETED;
 
-    if ((pDirection == EDirection.LEFT) & (leftProvider == null))
+    if (pDirection == EDirection.LEFT && leftProvider == null)
       return EDiff.MISSING;
 
-    if ((pDirection == EDirection.RIGHT) & (rightProvider == null))
+    if (pDirection == EDirection.RIGHT && rightProvider == null)
       return EDiff.MISSING;
 
     return EDiff.NOT_EVALUATED;
@@ -97,71 +88,25 @@ public class ProviderPair extends AbstractPair
   @Override
   public boolean isEqual()
   {
-    if ((leftProvider == null) & (rightProvider == null))
+    if (leftProvider == null && rightProvider == null)
       return true;
 
-    if ((leftProvider != null) & (rightProvider == null))
-      return leftProvider.getPit().getProperties().size() == 0;//Länge 0 und null gleich behandeln
+    if (leftProvider != null && rightProvider == null)
+      return leftProvider.getPit().getProperties().isEmpty();
 
-    if ((leftProvider == null) & (rightProvider != null))
-      return rightProvider.getPit().getProperties().size() == 0;//null und Länge 0 gleich
+    if (leftProvider == null)
+      return rightProvider.getPit().getProperties().isEmpty();
 
     return true;
-
   }
-
-  private IPropertyPitProvider _createScheme(IPropertyPitProvider pProvider)
-  {
-    String name = pProvider.getPit().getOwnProperty().getName();
-    Class type = pProvider.getPit().getOwnProperty().getType();
-    return FACTORY.create(name, type);
-  }
-
-  public IPropertyPitProvider _activate(IPropertyPitProvider pParent, IPropertyPitProvider pScheme)
-  {
-    if (pParent instanceof AbstractIndexedMutablePPP)
-    {
-      AbstractIndexedMutablePPP parentPPP = (AbstractIndexedMutablePPP) pParent;
-      IProperty property = parentPPP.findProperty(pScheme.getPit().getOwnProperty().getDescription());
-
-      if (parentPPP.findProperty(pScheme.getPit().getOwnProperty().getDescription()) == null)
-        property = parentPPP.addProperty(pScheme);
-
-      return (IPropertyPitProvider) property.getValue();
-    }
-    else
-    {
-      IPropertyDescription description = pScheme.getPit().getOwnProperty().getDescription();
-      return (IPropertyPitProvider) pParent.getPit().setValue(description, pScheme);
-    }
-  }
-
-  private void _delete(IPropertyPitProvider pParent, IPropertyDescription pDescription)
-  {
-    if (pParent instanceof AbstractIndexedMutablePPP)
-    {
-      AbstractIndexedMutablePPP parentPPP = (AbstractIndexedMutablePPP) pParent;
-      IProperty property = parentPPP.findProperty(pDescription);
-      parentPPP.removeProperty(property);
-    }
-    else
-    {
-      pParent.getPit().setValue(pDescription, null);
-    }
-  }
-  
 
   @Override
-  public void createDown(@NotNull EDirection pDirection, IPropertyPitProvider pParent)
+  public void createDown(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pParent)
   {
     if (pDirection == EDirection.RIGHT)
     {
-      if ((rightProvider == null) & (leftProvider != null))
-      {
-        rightProvider = _activate(pParent, _createScheme(leftProvider));
-        _createHandler();
-        handler.providerCreated(rightProvider);
-      }
+      if (rightProvider == null && leftProvider != null)
+        rightProvider = activate(pParent, createScheme(leftProvider));
 
       if (rightProvider != null)
         getHost().createDown(pDirection, rightProvider);
@@ -169,326 +114,243 @@ public class ProviderPair extends AbstractPair
 
     if (pDirection == EDirection.LEFT)
     {
-      if ((leftProvider == null) & (rightProvider != null))
-      {
-        leftProvider = _activate(pParent, _createScheme(rightProvider));
-        _createHandler();
-        handler.providerCreated(leftProvider);
-      }
+      if (leftProvider == null && rightProvider != null)
+        leftProvider = activate(pParent, createScheme(rightProvider));
 
       if (leftProvider != null)
         getHost().createDown(pDirection, leftProvider);
     }
   }
 
-  private void _createHandler()
-  {
-    if (handler == null)
-      handler = new ProviderRestoreHandler();
-  }
-
   @Override
-  public void deleteDown(@NotNull EDirection pDirection)
+  public void deleteDown(@NonNull EDirection pDirection)
   {
-    _createHandler();
-
     if (pDirection == EDirection.RIGHT & rightProvider != null)
     {
-      handler.providerToRemove(pDirection, rightProvider);
       getHost().deleteDown(pDirection);
       rightProvider = null;
     }
 
     if (pDirection == EDirection.LEFT & leftProvider != null)
     {
-      handler.providerToRemove(pDirection, leftProvider);
       getHost().deleteDown(pDirection);
       leftProvider = null;
     }
-
   }
-  
 
   @Override
-  protected void create(@NotNull EDirection pDirection, AtomicReference pRef)
+  protected IPropertyPitProvider<?, ?, ?> create(@NonNull EDirection pDirection) //NOSONAR I won't refactor this, because something will break for sure..
   {
     if (pDirection == EDirection.LEFT)
     {
-      if (leftProvider == null & restoreHandler == null)
+      if (leftProvider == null && restoreHandler == null)
       {
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(null);//merkt sich das der Provider auf dieser Seite null war
-        AtomicReference<Object> ref = new AtomicReference<>();
-        getHost().parent().getPair().create(pDirection,  ref);
-        Object parentObj = ref.get();
+        restoreHandler.setModel(null);
 
+        IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(pDirection);
         if (parentObj instanceof AbstractIndexedMutablePPP)
         {
-          AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-          IProperty property = mutableParent.findProperty(rightProvider.getPit().getOwnProperty().getName());
+          AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+          IProperty<?, ?> property = mutableParent.findProperty(rightProvider.getPit().getOwnProperty().getName());
           if (property != null)
-          {
-            leftProvider = (IPropertyPitProvider) property.getValue();
-          }
+            leftProvider = (IPropertyPitProvider<?, ?, ?>) property.getValue();
           else
           {
-            IPropertyPitProvider value = new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue();
-            leftProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+            IPropertyPitProvider<?, ?, ?> value = new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue();
+
+            //noinspection unchecked,rawtypes
+            leftProvider = (IPropertyPitProvider<?, ?, ?>) ((AbstractIndexedMutablePPP) mutableParent).addProperty(value).getValue();
           }
         }
-        else if (parentObj instanceof IPropertyPitProvider)
-        {
-          IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-          leftProvider = (IPropertyPitProvider) prov.getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
-        }
+        else if (parentObj != null)
+          //noinspection unchecked,rawtypes
+          leftProvider = (IPropertyPitProvider) ((IPropertyPitProvider) parentObj).getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
       }
 
-      pRef.set(leftProvider);
+      return leftProvider;
     }
 
     if (pDirection == EDirection.RIGHT)
     {
-      if (rightProvider == null & restoreHandler == null)
+      if (rightProvider == null && restoreHandler == null)
       {
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(null);//merkt sich das der Provider auf dieser Seite null war
-        AtomicReference<Object> ref = new AtomicReference<>();
-        getHost().parent().getPair().create(pDirection, ref);
-        Object parentObj = ref.get();
+        restoreHandler.setModel(null);
 
-        if (parentObj instanceof AbstractIndexedMutablePPP)
+        IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(pDirection);
+        if (parentObj instanceof AbstractIndexedMutablePPP<?, ?, ?>)
         {
-          AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-          IProperty property = mutableParent.findProperty(leftProvider.getPit().getOwnProperty().getName());
+          AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+          IProperty<?, ?> property = mutableParent.findProperty(leftProvider.getPit().getOwnProperty().getName());
           if (property != null)
-          {
-            rightProvider = (IPropertyPitProvider) property.getValue();
-          }
+            rightProvider = (IPropertyPitProvider<?, ?, ?>) property.getValue();
           else
           {
-            IPropertyPitProvider value = new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue();
-            rightProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+            IPropertyPitProvider<?, ?, ?> value = new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue();
+
+            //noinspection unchecked,rawtypes
+            rightProvider = (IPropertyPitProvider<?, ?, ?>) ((AbstractIndexedMutablePPP) mutableParent).addProperty(value).getValue();
           }
         }
-        else if (parentObj instanceof IPropertyPitProvider)
-        {
-          IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-          rightProvider = (IPropertyPitProvider) prov.getPit().getValue(leftProvider.getPit().getOwnProperty().getDescription());
-        }
+        else if (parentObj != null)
+          //noinspection unchecked,rawtypes
+          rightProvider = (IPropertyPitProvider) ((IPropertyPitProvider) parentObj).getPit().getValue(leftProvider.getPit().getOwnProperty().getDescription());
       }
-      pRef.set(rightProvider);
 
+      return rightProvider;
     }
-  }
 
+    return null;
+  }
 
   @Override
-  public boolean containsProvider(IPropertyPitProvider pProvider)
+  public boolean containsProvider(@NonNull IPropertyPitProvider<?, ?, ?> pProvider)
   {
-    String name = pProvider.getPit().getOwnProperty().getName();
-    if ((leftProvider != null) && leftProvider.getPit().getOwnProperty().getName().equalsIgnoreCase(name))
-      return true;
-
-    if ((rightProvider != null) && rightProvider.getPit().getOwnProperty().getName().equalsIgnoreCase(name))
-      return true;
-
-    return false;
+    String nameToCheck = pProvider.getPit().getOwnProperty().getName();
+    return (leftProvider != null && leftProvider.getPit().getOwnProperty().getName().equalsIgnoreCase(nameToCheck)) ||
+        (rightProvider != null && rightProvider.getPit().getOwnProperty().getName().equalsIgnoreCase(nameToCheck));
   }
 
-  public String nameForDisplay(EDirection pDirection)
+  @Nullable
+  public String nameForDisplay(@NonNull EDirection pDirection)
   {
-
     if (pDirection == EDirection.LEFT)
-    {
-      if (leftProvider != null && leftProvider.getPit().isValid())
-        return leftProvider.getPit().getOwnProperty().getName();
-
-      return name;
-    }
-
-    if (pDirection == EDirection.RIGHT)
-    {
-      if (rightProvider != null && rightProvider.getPit().isValid())
-        return rightProvider.getPit().getOwnProperty().getName();
-
-      return name;
-    }
-
+      return nameForDisplay(leftProvider, name);
+    else if (pDirection == EDirection.RIGHT)
+      return nameForDisplay(rightProvider, name);
     return name;
   }
 
-  public String nameForDebugPrint()
-  {
-    String leftPart = EDirection.LEFT.name() + " ____ ";
-    if (leftProvider != null)
-      leftPart = EDirection.LEFT.name() + " " + _buildName(leftProvider);
-
-    String rightPart = EDirection.RIGHT.name() + " ____ ";
-    if (rightProvider != null)
-      rightPart = EDirection.RIGHT.name() + " " + _buildName(rightProvider);
-
-    return leftPart + "   " + rightPart;
-  }
-
+  @NonNull
   @Override
   public String nameForIdentification()
   {
     if (name == null)
       return "Root";
-
     return name;
   }
 
-  private String _buildName(IPropertyPitProvider pProvider)
-  {
-    IProperty ownProp = pProvider.getPit().getOwnProperty();
-    return ownProp.getName();
-  }
-
-  /**
-   * Für Anzeige im IntelliJ Debugger
-   */
   @Override
   public String toString()
   {
-    return nameForDisplay(EDirection.LEFT);//getName() + "  Prov";
+    return nameForDisplay(EDirection.LEFT);
   }
 
   @Override
-  public void update(@NotNull EDirection pDirection)
+  public void update(@NonNull EDirection pDirection) //NOSONAR I won't refactor this, because something will break for sure..
   {
     if (restoreHandler != null)
       return;
 
-    if ((leftProvider != null) & (rightProvider != null))
+    if (leftProvider != null && rightProvider != null)
     {
       getHost().postUpdateDown(pDirection);
       return;
     }
 
-    if (pDirection == EDirection.LEFT)//delete / create linkes Datenmodell
+    if (pDirection == EDirection.LEFT) //delete / create left model
     {
-      if (rightProvider == null)
+      if (rightProvider == null) // delete left
       {
-        //delete links
         restoreHandler = new RestoreHandler(pDirection);
-
-        if (leftProvider.getPit().isValid())
-        {
-          IPropertyPitProvider propertly = new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue();
-          restoreHandler.setPropertly(propertly);//merkt sich das der Provider auf dieser Seite null war
-        }
+        if (leftProvider != null && leftProvider.getPit().isValid())
+          restoreHandler.setModel(new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue());
         else
-          restoreHandler.setPropertly(leftProvider);
+          restoreHandler.setModel(leftProvider);
 
-
-        if (leftProvider.getPit().isValid())
+        if (leftProvider != null && leftProvider.getPit().isValid())
         {
-          IPropertyPitProvider parent = leftProvider.getPit().getParent();
-
-          if (parent instanceof AbstractIndexedMutablePPP)
-          {
-            AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parent;
-            mutableParent.removeProperty(leftProvider.getPit().getOwnProperty());
-          }
+          IPropertyPitProvider<?, ?, ?> parent = leftProvider.getPit().getParent();
+          if (parent instanceof AbstractIndexedMutablePPP<?, ?, ?>)
+            //noinspection unchecked,rawtypes
+            ((AbstractIndexedMutablePPP) parent).removeProperty(leftProvider.getPit().getOwnProperty());
         }
 
         leftProvider = null;
         getHost().postUpdateDown(pDirection);
       }
-      else
+      else // create left
       {
-        //create linkes Datenmodell
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(null);//merkt sich das der Provider auf dieser Seite null war
-        AtomicReference<Object> ref = new AtomicReference<>();
-        getHost().parent().getPair().create(pDirection, ref);
-        Object parentObj = ref.get();
+        restoreHandler.setModel(null);
 
-        if (parentObj instanceof AbstractIndexedMutablePPP)
+        IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(pDirection);
+        if (parentObj instanceof AbstractIndexedMutablePPP<?, ?, ?>)
         {
-          AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-          IProperty property = mutableParent.findProperty(rightProvider.getPit().getOwnProperty().getName());
+          AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+          IProperty<?, ?> property = mutableParent.findProperty(rightProvider.getPit().getOwnProperty().getName());
           if (property != null)
           {
-            leftProvider = (IPropertyPitProvider) property.getValue();
+            leftProvider = (IPropertyPitProvider<?, ?, ?>) property.getValue();
             getHost().postUpdateDown(pDirection);
           }
           else
           {
-            IPropertyPitProvider value = new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue();
-            leftProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+            //noinspection unchecked,rawtypes
+            leftProvider = (IPropertyPitProvider) ((AbstractIndexedMutablePPP) mutableParent)
+                .addProperty(new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue())
+                .getValue();
             getHost().postUpdateDown(pDirection);
           }
         }
-        else if (parentObj instanceof IPropertyPitProvider)
+        else if (parentObj != null)
         {
-          IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-          leftProvider = (IPropertyPitProvider) prov.getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
+          //noinspection unchecked,rawtypes
+          leftProvider = (IPropertyPitProvider) ((IPropertyPitProvider) parentObj).getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
           getHost().postUpdateDown(pDirection);
         }
       }
     }
-
-    if (pDirection == EDirection.RIGHT)//delete / create rechtes Datenmodell
+    else if (pDirection == EDirection.RIGHT) //delete / create right model
     {
-      if (leftProvider == null)
+      if (leftProvider == null) // delete right
       {
-       
-        //delete rechts
         restoreHandler = new RestoreHandler(pDirection);
-
-        if (rightProvider.getPit().isValid())
-        {
-          IPropertyPitProvider propertly = new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue();
-          restoreHandler.setPropertly(propertly);//merkt sich das der Provider auf dieser Seite null war
-        }
+        if (rightProvider != null && rightProvider.getPit().isValid())
+          restoreHandler.setModel(new Hierarchy<>(rightProvider.getPit().getOwnProperty().getName(), rightProvider).getValue());
         else
-          restoreHandler.setPropertly(rightProvider);
-        
+          restoreHandler.setModel(rightProvider);
 
-        if (rightProvider.getPit().isValid())
+        if (rightProvider != null && rightProvider.getPit().isValid())
         {
-          IPropertyPitProvider parent = rightProvider.getPit().getParent();
-
-          if (parent instanceof AbstractIndexedMutablePPP)
-          {
-            AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parent;
-            mutableParent.removeProperty(rightProvider.getPit().getOwnProperty());
-          }
+          IPropertyPitProvider<?, ?, ?> parent = rightProvider.getPit().getParent();
+          if (parent instanceof AbstractIndexedMutablePPP<?, ?, ?>)
+            //noinspection unchecked,rawtypes
+            ((AbstractIndexedMutablePPP) parent).removeProperty(rightProvider.getPit().getOwnProperty());
         }
 
         rightProvider = null;
         getHost().postUpdateDown(pDirection);
       }
-      else
-      {//create rechtes Datenmodell
+      else // create right
+      {
         restoreHandler = new RestoreHandler(pDirection);
-        restoreHandler.setPropertly(null);//merkt sich das der Provider auf dieser Seite null war
-        AtomicReference<Object> ref = new AtomicReference<>();
-        getHost().parent().getPair().create(pDirection, ref);
-        Object parentObj = ref.get();
+        restoreHandler.setModel(null);
 
-        if (parentObj instanceof AbstractIndexedMutablePPP)
+        IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(pDirection);
+        if (parentObj instanceof AbstractIndexedMutablePPP<?, ?, ?>)
         {
-          AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-          IProperty property = mutableParent.findProperty(leftProvider.getPit().getOwnProperty().getName());
+          AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+          IProperty<?, ?> property = mutableParent.findProperty(leftProvider.getPit().getOwnProperty().getName());
           if (property != null)
           {
-            rightProvider = (IPropertyPitProvider) property.getValue();
+            rightProvider = (IPropertyPitProvider<?, ?, ?>) property.getValue();
             getHost().postUpdateDown(pDirection);
           }
           else
-          {//Tiefe Kopie des linken Datenmodells erzeugen
-            IPropertyPitProvider value = new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue();
-            rightProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+          {
+            //noinspection unchecked,rawtypes
+            rightProvider = (IPropertyPitProvider<?, ?, ?>) ((AbstractIndexedMutablePPP) mutableParent)
+                .addProperty(new Hierarchy<>(leftProvider.getPit().getOwnProperty().getName(), leftProvider).getValue())
+                .getValue();
             getHost().postUpdateDown(pDirection);
           }
         }
-        else if (parentObj instanceof IPropertyPitProvider)
+        else if (parentObj != null)
         {
-          IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-          rightProvider = (IPropertyPitProvider) prov.getPit().getValue(leftProvider.getPit().getOwnProperty().getDescription());
+          //noinspection unchecked,rawtypes
+          rightProvider = (IPropertyPitProvider) ((IPropertyPitProvider) parentObj).getPit().getValue(leftProvider.getPit().getOwnProperty().getDescription());
           getHost().postUpdateDown(pDirection);
         }
       }
@@ -496,27 +358,23 @@ public class ProviderPair extends AbstractPair
   }
 
   @Override
-  public void restore()
+  public void restore() //NOSONAR I won't refactor this, because something will break for sure..
   {
-    if ((restoreHandler != null))
+    if (restoreHandler != null)
     {
-      //Hier restoren
       EDirection direction = restoreHandler.getDirection();
-      Object propertly = restoreHandler.getPropertly();
+      Object property = restoreHandler.getModel();
 
       if (direction == EDirection.LEFT)
       {
-        if (RestoreHandler.isSet(propertly) & propertly == null)
+        if (RestoreHandler.isSet(property) & property == null)
         {
           if (leftProvider.getPit().isValid())
           {
-            IPropertyPitProvider parent = leftProvider.getPit().getParent();
-
+            IPropertyPitProvider<?, ?, ?> parent = leftProvider.getPit().getParent();
             if (parent instanceof AbstractIndexedMutablePPP)
-            {
-              AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parent;
-              mutableParent.removeProperty(leftProvider.getPit().getOwnProperty());
-            }
+              //noinspection unchecked,rawtypes
+              ((AbstractIndexedMutablePPP) parent).removeProperty(leftProvider.getPit().getOwnProperty());
           }
           restoreHandler = null;
           leftProvider = null;
@@ -524,10 +382,8 @@ public class ProviderPair extends AbstractPair
         }
         else
         {
-          AtomicReference<Object> ref = new AtomicReference<>();
-          getHost().parent().getPair().create(direction, ref);
-          Object parentObj = ref.get();
-          if (parentObj==null)
+          IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(direction);
+          if (parentObj == null)
           {
             getHost().parent().getPair().restore();
             return;
@@ -535,44 +391,32 @@ public class ProviderPair extends AbstractPair
 
           if (parentObj instanceof AbstractIndexedMutablePPP)
           {
-            AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-            IProperty property = mutableParent.findProperty(name);
-            if (property != null)
+            AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+            IProperty<?, ?> prop = mutableParent.findProperty(name);
+            if (prop != null)
             {
-              leftProvider = (IPropertyPitProvider) property.getValue();
-              getHost().restoreDown();
-            }
-            else
-            {
-              IPropertyPitProvider value = new Hierarchy<>(name, (IPropertyPitProvider) propertly).getValue();
-              leftProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+              leftProvider = (IPropertyPitProvider<?, ?, ?>) prop.getValue();
               getHost().restoreDown();
             }
           }
-          else if (parentObj instanceof IPropertyPitProvider)
+          else
           {
-            IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-            leftProvider = (IPropertyPitProvider) prov.getPit().findProperty(name).getValue();//(IPropertyPitProvider) prov.getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
-
-
+            //noinspection rawtypes
+            leftProvider = (IPropertyPitProvider) Objects.requireNonNull(((IPropertyPitProvider) parentObj).getPit().findProperty(name)).getValue();
             getHost().restoreDown();
           }
         }
       }
-//**************************************************************
-      if (direction == EDirection.RIGHT)
+      else if (direction == EDirection.RIGHT)
       {
-        if (RestoreHandler.isSet(propertly) & propertly == null)
+        if (RestoreHandler.isSet(property) & property == null)
         {
           if (rightProvider.getPit().isValid())
           {
-            IPropertyPitProvider parent = rightProvider.getPit().getParent();
-
+            IPropertyPitProvider<?, ?, ?> parent = rightProvider.getPit().getParent();
             if (parent instanceof AbstractIndexedMutablePPP)
-            {
-              AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parent;
-              mutableParent.removeProperty(rightProvider.getPit().getOwnProperty());
-            }
+              //noinspection unchecked,rawtypes
+              ((AbstractIndexedMutablePPP) parent).removeProperty(rightProvider.getPit().getOwnProperty());
           }
           restoreHandler = null;
           rightProvider = null;
@@ -580,47 +424,96 @@ public class ProviderPair extends AbstractPair
         }
         else
         {
-          AtomicReference<Object> ref = new AtomicReference<>();
-          getHost().parent().getPair().create(direction, ref);
-          Object parentObj = ref.get();
-          if (parentObj==null)
+          IPropertyPitProvider<?, ?, ?> parentObj = getHost().parent().getPair().create(direction);
+          if (parentObj == null)
           {
             getHost().parent().getPair().restore();
             return;
           }
-    
+
           if (parentObj instanceof AbstractIndexedMutablePPP)
           {
-            AbstractIndexedMutablePPP mutableParent = (AbstractIndexedMutablePPP) parentObj;
-            IProperty property = mutableParent.findProperty(name);
-            if (property != null)
+            AbstractIndexedMutablePPP<?, ?, ?> mutableParent = (AbstractIndexedMutablePPP<?, ?, ?>) parentObj;
+            IProperty<?, ?> prop = mutableParent.findProperty(name);
+            if (prop != null)
             {
-              rightProvider = (IPropertyPitProvider) property.getValue();
-              getHost().restoreDown();
-            }
-            else
-            {
-              IPropertyPitProvider value = new Hierarchy<>(name, (IPropertyPitProvider) propertly).getValue();
-              rightProvider = (IPropertyPitProvider) mutableParent.addProperty(value).getValue();
+              rightProvider = (IPropertyPitProvider<?, ?, ?>) prop.getValue();
               getHost().restoreDown();
             }
           }
-          else if (parentObj instanceof IPropertyPitProvider)
+          else
           {
-            IPropertyPitProvider prov = (IPropertyPitProvider) parentObj;
-            rightProvider = (IPropertyPitProvider) prov.getPit().findProperty(name).getValue();//(IPropertyPitProvider) prov.getPit().getValue(rightProvider.getPit().getOwnProperty().getDescription());
-            
-            
+            //noinspection rawtypes
+            rightProvider = (IPropertyPitProvider<?, ?, ?>) Objects.requireNonNull(((IPropertyPitProvider) parentObj).getPit().findProperty(name)).getValue();
             getHost().restoreDown();
           }
         }
       }
+
       restoreHandler = null;
     }
-    else//restoreHandler = null;
-    {
+    else
       getHost().restoreDown();
-    }
+  }
 
+  /**
+   * Creates a new instance of an {@link IPropertyPitProvider} that has the same type as the given one
+   *
+   * @param pProvider Provider to determine the type from
+   * @param <T>       type of the provider
+   * @return a newly created instance
+   */
+  @NonNull
+  private <T extends IPropertyPitProvider<?, ?, ?>> T createScheme(@NonNull T pProvider)
+  {
+    //noinspection unchecked
+    return new DataModelFactory().create(pProvider.getPit().getOwnProperty().getName(),
+                                         (Class<T>) pProvider.getPit().getOwnProperty().getType());
+  }
+
+  /**
+   * Updates the parent, so that the given scheme will be included
+   *
+   * @param pParent Parent that should contain the given scheme
+   * @param pScheme Scheme that should be included
+   * @param <T>     type of the scheme
+   * @return the included scheme
+   */
+  @Nullable
+  private <T extends IPropertyPitProvider<?, ?, ?>> T activate(@Nullable IPropertyPitProvider<?, ?, ?> pParent, @NonNull T pScheme)
+  {
+    if (pParent instanceof AbstractIndexedMutablePPP)
+    {
+      AbstractIndexedMutablePPP<?, ?, ?> parentPPP = (AbstractIndexedMutablePPP<?, ?, ?>) pParent;
+
+      //noinspection unchecked,rawtypes
+      IProperty<?, ?> property = parentPPP.findProperty((IPropertyDescription) pScheme.getPit().getOwnProperty().getDescription());
+      if (property == null)
+        //noinspection unchecked,rawtypes
+        property = ((AbstractIndexedMutablePPP) parentPPP).addProperty(pScheme);
+
+      //noinspection unchecked
+      return (T) property.getValue();
+    }
+    else if (pParent != null)
+      //noinspection unchecked,rawtypes
+      return (T) ((IPropertyPitProvider) pParent).getPit().setValue(pScheme.getPit().getOwnProperty().getDescription(), pScheme);
+
+    return null;
+  }
+
+  /**
+   * Returns a readable string to display the {@link IPropertyPitProvider} on GUI elements
+   *
+   * @param pProvider {@link IPropertyPitProvider} to get the name for
+   * @param pFallback Fallback, if the provider is null or invalid
+   * @return a name to display
+   */
+  @Nullable
+  private String nameForDisplay(@Nullable IPropertyPitProvider<?, ?, ?> pProvider, @Nullable String pFallback)
+  {
+    if (pProvider != null && pProvider.getPit().isValid())
+      return pProvider.getPit().getOwnProperty().getName();
+    return pFallback;
   }
 }

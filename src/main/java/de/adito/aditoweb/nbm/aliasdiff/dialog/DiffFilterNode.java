@@ -1,39 +1,57 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.*;
-import org.jetbrains.annotations.*;
+import lombok.NonNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.swing.tree.MutableTreeNode;
+import javax.swing.tree.*;
+import java.util.*;
 
 /**
- * Ergebnis einer Filterung, der Node enthält den originalen Node
- * und reicht diverse Methodenaufrufe an diesen weiter.
+ * Result of filtering, the node contains the original
+ * node and passes various method calls to it.
+ *
  * @author T.Tasior, 27.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
-public class DiffFilterNode extends FilterNode implements IDiffNode
+public class DiffFilterNode extends DefaultMutableTreeNode implements IDiffNode
 {
-  private IDiffNode node;
+  private final IDiffNode node;
 
-  public DiffFilterNode(MutableTreeNode pNode, ITreeNodeFilter pFilter)
+  public DiffFilterNode(@NonNull MutableTreeNode pNode, @NonNull ITreeNodeFilter pFilter)
   {
-    super(pNode, pFilter);
+    super(pNode);
     node = (IDiffNode) pNode;
+
+    setUserObject(pNode);
+
+    ArrayList<MutableTreeNode> collector = new ArrayList<>();
+    for (int i = 0; i < pNode.getChildCount(); i++)
+    {
+      MutableTreeNode child = (MutableTreeNode) pNode.getChildAt(i);
+      List<MutableTreeNode> children = pFilter.filterChild(child);
+      collector.addAll(children);
+    }
+
+    for (MutableTreeNode child : collector)
+      add(child);
   }
 
   @Override
-  public boolean isReadOnly(@NotNull EDirection pDirection)
+  public boolean isReadOnly(@NonNull EDirection pDirection)
   {
     return node.isReadOnly(pDirection);
   }
 
+  @NonNull
   @Override
-  public String getRootName(EDirection pDirection)
+  public String getRootName(@NonNull EDirection pDirection)
   {
     return node.getRootName(pDirection);
   }
 
   @Override
-  public boolean isRemote(@NotNull EDirection pDirection)
+  public boolean isRemote(@NonNull EDirection pDirection)
   {
     return node.isRemote(pDirection);
   }
@@ -50,25 +68,28 @@ public class DiffFilterNode extends FilterNode implements IDiffNode
     node.write();
   }
 
+  @Nullable
   @Override
-  public String nameForDisplay(EDirection pDirection)
+  public String nameForDisplay(@NonNull EDirection pDirection)
   {
     return node.nameForDisplay(pDirection);
   }
 
+  @NonNull
   @Override
   public DiffStateCollector collectDiffStates(@Nullable DiffStateCollector pParentCollector)
   {
     return node.collectDiffStates(pParentCollector);
   }
 
+  @NonNull
   @Override
-  public EDiff getDiff(@NotNull EDirection pDir)
+  public EDiff getDiff(@NonNull EDirection pDirection)
   {
-    return node.getDiff(pDir);
+    return node.getDiff(pDirection);
   }
 
-
+  @NonNull
   @Override
   public AbstractPair getPair()
   {
@@ -78,7 +99,6 @@ public class DiffFilterNode extends FilterNode implements IDiffNode
   @Override
   public boolean getAllowsChildren()
   {
-    return getChildCount()>0;
-    
+    return getChildCount() > 0;
   }
 }

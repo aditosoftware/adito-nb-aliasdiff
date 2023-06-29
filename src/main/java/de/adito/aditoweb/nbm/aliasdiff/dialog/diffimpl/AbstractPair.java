@@ -1,187 +1,150 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
-import de.adito.aditoweb.system.crmcomponents.DataModelFactory;
 import de.adito.propertly.core.spi.*;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.concurrent.atomic.AtomicReference;
+import lombok.*;
+import org.jetbrains.annotations.Nullable;
 
 /**
- * Verwaltet ein Paar von IPropertyPitProvider Objekten,
- * oder pProperty Objekten. Ist eingebettet in einen PropertyNode.
- * Die Objekte können auch null sein.
- *
- * Die konkreten Implementierungen sind auf jeweils einen Typ
- * spezialisiert.
- *
- * Welches der beiden Objekte angesprochen werden soll, wird
- * durch eine Richtungsangabe abgebildet.
+ * Contains a pair of IPropertyPitProvider or IProperty objects.
+ * Is embedded in a {@link PropertyNode} - the inner objects may be null.
+ * <p>
+ * The implementations are specialized on one single type.
+ * <p>
+ * Which of the two objects is to be addressed is indicated by a direction indication.
  *
  * @author t.tasior, 07.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  * @see EDirection
  * @see PropertyNode
  */
+@RequiredArgsConstructor
 public abstract class AbstractPair
 {
-  public final static DataModelFactory FACTORY = new DataModelFactory();
+  @NonNull
+  @Getter(AccessLevel.PACKAGE)
   private final PropertyNode host;
 
   /**
-   * Wird vom PropertyNode aufgerufen.
-   *
-   * @param pHost PropertyNode der dieses Objekt
+   * @return the name of an IDataModel implementation or a name of an IProperty,
+   * that uniquely identifies an object inside a model hierarchy
    */
-  public AbstractPair(PropertyNode pHost)
-  {
-    host = pHost;
-  }
-
-  /**
-   * Liefert den PropertyNode der dieses Objekt verwaltet
-   *
-   * @return nimals null.
-   */
-  PropertyNode getHost()
-  {
-    return host;
-  }
-
-  /**
-   * Nur eine Hilfsmethode für die Weiterentwicklung/Fehlersuche.
-   *
-   * @return einen aussagekräftigen Namen.
-   */
-  public abstract String nameForDebugPrint();
-
-  /**
-   * Liefert den Namen einer IDataModel Implementierung,
-   * oder den Namen eines IProperty.
-   *
-   * @return den Namen der ein Objekt in der Datenmodellhierarchie
-   * eindeutig identifiziert.
-   */
+  @NonNull
   public abstract String nameForIdentification();
 
   /**
-   * Liefert einen Namen der auf der GUI angezeigt wird.
+   * Returns a name that should be displayed on a GUI.
    *
-   * @param pDirection entscheidet auf welcher Seite im Dialog
-   *                   der Name angezeigt wird.
-   * @return einen String, oder null.
+   * @param pDirection determines on which side the name should be displayed
+   * @return a string or null
    */
-  public abstract String nameForDisplay(@NotNull EDirection pDirection);
+  @Nullable
+  public abstract String nameForDisplay(@NonNull EDirection pDirection);
 
   /**
-   * Liefert für die jeweilige Seite die Art der Differenz.
+   * Returns the type of the difference on the given side
    *
-   * @param pDirection entscheidet für die Darstellung im Baum.
-   * @return eine EDiff Konstante.
+   * @param pDirection the searched side
+   * @return an {@link EDiff} constant
    */
-  public abstract EDiff typeOfDiff(@NotNull EDirection pDirection);
+  @NonNull
+  public abstract EDiff typeOfDiff(@NonNull EDirection pDirection);
 
   /**
-   * Liefert true, wenn die zu überprüfenden Objekte als gleich betrachtet werden.
-   *
-   * @return true bei Gleichheit.
+   * @return true, if both objects are equal
    */
   public abstract boolean isEqual();
-  
-  /**
-   * Ein Objekt soll erzeugt werden und in das übergebenene Parentobjekt eingehängt werden.
-   *
-   * @param pDirection gibt an für welches der beiden verglichenen Datenmodelle
-   *                   das Objekt angelegt werden soll.
-   * @param pParent    ein Datenmodell dem ein neuer Wert (Objekt) gesetzt wird:
-   */
-  public abstract void createDown(@NotNull EDirection pDirection, IPropertyPitProvider pParent);
 
   /**
-   * Ein Knoten signalisiert seinen Kindern ihre Werte zu löschen.
+   * An object should be created and appended into the parent object
    *
-   * @param pDirection gibt an aus welchem der beiden Datenmodelle gelöscht werden soll.
+   * @param pDirection determines where the object should be created
+   * @param pParent    a data model to which a new value (object) is set
    */
-  public abstract void deleteDown(@NotNull EDirection pDirection);
+  public abstract void createDown(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pParent);
 
   /**
-   * Die konkrete Implementierung übernimmt hier das zu verwaltende IPropertyPitProvider
-   * Objekt.
+   * A node fires, that the children should be deleted
    *
-   * @param pDirection die jeweilige Seite des Datenmodells.
-   * @param pProvider  der zu verwaltende Provider, oder null wenn es in dem analysierten
-   *                   Datenmodell keinen gibt.
-   * @throws UnsupportedOperationException in der abstrakten Implementierung.
+   * @param pDirection direction where the children should be deleted
    */
-  public void setProvider(@NotNull EDirection pDirection, IPropertyPitProvider pProvider)
-  {
-    throw new UnsupportedOperationException();
-
-  }
+  public abstract void deleteDown(@NonNull EDirection pDirection);
 
   /**
-   * Die konkrete Implementierung übernimmt hier das zu verwaltende IProperty
-   * Objekt.
+   * Sets the provider in the given direction
    *
-   * @param pDirection die jeweilige Seite des Datenmodells.
-   * @param pProperty  das zu verwaltende IProperty, oder null wenn es in dem analysierten
-   *                   Datenmodell keines gibt.
+   * @param pDirection direction to set the provider
+   * @param pProvider  the provider to be managed, or null if there is none in the analyzed data model.
    */
-  public void setProperty(@NotNull EDirection pDirection, IProperty pProperty)
+  public void setProvider(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pProvider)
   {
     throw new UnsupportedOperationException();
   }
 
   /**
-   * Liefert true, wenn das Property bereits vorhanden ist.
-   * In welchem der beiden Datenmodelle ist egal.
+   * Sets the property in the given direction
    *
-   * @param pProp dient zum Vergleich.
-   * @return true, wenn es schon existiert.
+   * @param pDirection direction to set the property
+   * @param pProperty  the property to be managed, or null if there is none in the analyzed data model.
    */
-  public boolean containsProperty(@NotNull IProperty pProp)
+  public void setProperty(@NonNull EDirection pDirection, @Nullable IProperty<?, ?> pProperty)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Returns true if the IProperty already exists.
+   * It doesn't matter in which of the two data models.
+   *
+   * @param pProp IProperty to check
+   * @return true, if it exists
+   */
+  public boolean containsProperty(@NonNull IProperty<?, ?> pProp)
   {
     return false;
   }
 
   /**
-   * Liefert true, wenn der IPropertyPitProvider bereits vorhanden ist.
-   * In welchem der beiden Datenmodelle ist egal.
+   * Returns true if the IPropertyPitProvider already exists.
+   * It doesn't matter in which of the two data models.
    *
-   * @param pProvider dient zum Vergleich.
-   * @return true, wenn der Provider bereits existiert.
+   * @param pProvider IPropertyPitProvider to check
+   * @return true, if it exists
    */
-  public boolean containsProvider(IPropertyPitProvider pProvider)
+  public boolean containsProvider(@NonNull IPropertyPitProvider<?, ?, ?> pProvider)
   {
     return false;
   }
 
   /**
-   * Veranlasst das Setzen oder Entfernen eines Wertes im jeweiligen Datenmodell.
+   * Initiates the setting or removal of a value in the respective data model.
    *
-   * @param pDirection gibt an in welchem der verglichenen Datenmodelle
-   *                   ein Wert geschrieben wird.
+   * @param pDirection Specifies in which of the compared data models a value is written.
    */
-  public abstract void update(@NotNull EDirection pDirection);
+  public abstract void update(@NonNull EDirection pDirection);
 
   /**
-   * Wird aufgerufen um den Ursprungszustand im Datenmodell wiederherzustellen.
+   * Invoked to restore the original state in the data model.
    */
   public abstract void restore();
 
   /**
-   * Hilfsmethode zum anlegen eines Datenmodells.
-   * @param pDirection gibt an auf welcher Seite das Datenmodell erzeugt werden soll.
-   * @param pRef transportiert das erzeugte Datenmodell zum Aufrufer.
+   * Creates a new datamodel in the given direction
+   *
+   * @param pDirection direction where the model should be created
+   * @return the created model
    */
-  protected abstract void create(@NotNull EDirection pDirection, AtomicReference pRef);
+  @Nullable
+  protected abstract IPropertyPitProvider<?, ?, ?> create(@NonNull EDirection pDirection);
 
   /**
-   * Liefert das durch diese Implementierung verwaltete Propertly.
+   * Returns the managed object
    *
-   * @param pDirection bestimmt die Seite für die das Propertly geliefert werden soll.
-   * @return ein IProperty oder IPropertyPitProvider, oder null.
+   * @param pDirection determines the side for which the object should be retrieved
+   * @return the IProperty, IPropertyPitProvider or null
    */
-  public abstract Object getManagedObject(@NotNull EDirection pDirection);
+  @Nullable
+  public abstract Object getManagedObject(@NonNull EDirection pDirection);
 
-  
+
 }

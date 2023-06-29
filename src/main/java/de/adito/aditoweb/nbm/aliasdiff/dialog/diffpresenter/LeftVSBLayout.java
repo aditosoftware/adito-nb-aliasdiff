@@ -1,20 +1,16 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter;
 
-/**
- * @author t.tasior, 13.02.2018
- */
-
-
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
 
-
 /**
- * Problem: Für das DiffPanel brauchen wir die vertikale Scrollbar einmal auf 
- * der Linken Seite des Baumes und ganz normal rechts. Die Installation
- * eines eigenen Layouts ist nur möglich wenn von ScrollPaneLayout geerbt wird.
- * Dieser Sourcecode ist nahezu identisch mit der OriginalKlasse.
+ * Problem: For the DiffPanel we need the vertical scrollbar once on the left side of the tree and normally on the right.
+ * Installing your own layout is only possible if you inherit from ScrollPaneLayout.
+ * This source code is almost identical to the original class.
+ *
+ * @author t.tasior, 09.02.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
 class LeftVSBLayout extends ScrollPaneLayout
 {

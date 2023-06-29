@@ -2,40 +2,41 @@ package de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.*;
+import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.tree.TreeNode;
 import java.util.EnumSet;
 
 /**
- * Ermittelt das nächste / vorherige Element im Baum mit einer Differenz.
+ * Determines the next / previous element in the tree, containing a difference
  *
  * @author T.Tasior, 12.04.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
  */
 class NavigationHandler
 {
   private final EnumSet<EDiff> diffStates;
   private final IDiffNode root;
-  private final _Memory mem;
+  private final Memory mem;
 
   /**
-   * Initialisierung mit der Wurzel des Baumes.
-   *
-   * @param pRoot der Baum durch den navigiert werden soll.
+   * @param pRoot the tree that should be navigated
    */
   public NavigationHandler(IDiffNode pRoot)
   {
     root = pRoot;
     diffStates = EnumSet.of(EDiff.DIFFERENT, EDiff.MISSING, EDiff.DELETED);
-    mem = new _Memory();
+    mem = new Memory();
   }
 
   /**
-   * Ermittelt einen Node mit einer Differenz in der Baumstruktur aufwärts.
+   * Finds a node with a difference in the tree structure upwards.
    *
-   * @param pNode falls gesetzt, wird von diesem Node die Berechnung durchgeführt.
-   * @return einen Node mit Differenz, oder null wenn es keine Differenzen gibt.
+   * @param pNode if set, the calculation is performed by this node.
+   * @return a node with difference, or null if there are no differences.
    */
+  @Nullable
   public TreeNode previous(@Nullable IDiffNode pNode)
   {
     if (root.countDifferences() == 0)
@@ -46,10 +47,10 @@ class NavigationHandler
     if (node != null)
     {
       mem.reset();
-      if (node.isLeaf() && _isDifferent(((IDiffNode) node).getPair()))
+      if (node.isLeaf() && isDifferent(((IDiffNode) node).getPair()))
       {
-        mem.set(node, _indexOf(node));
-        return _findPrevoiusIn(node);
+        mem.set(node, indexOf(node));
+        return findPreviousIn(node);
       }
     }
 
@@ -57,18 +58,19 @@ class NavigationHandler
       node = mem.difference;
 
     if (node == null)
-      node = _findLastNode();
+      node = findLastNode();
 
-    return _findPrevoiusIn(node);
+    return node == null ? null : findPreviousIn(node);
   }
 
   /**
-   * Ermittelt einen Node mit einer Differenz in der Baumstruktur abwärts.
+   * Finds a node with a difference in the tree structure downwards.
    *
-   * @param pNode falls gesetzt, wird von diesem Node die Berechnung durchgeführt.
-   * @return einen Node mit Differenz, oder null wenn es keine Differenzen gibt.
+   * @param pNode if set, the calculation is performed by this node.
+   * @return a node with difference, or null if there are no differences.
    */
-  public TreeNode next(IDiffNode pNode)
+  @Nullable
+  public TreeNode next(@Nullable IDiffNode pNode)
   {
     if (root.countDifferences() == 0)
       return null;
@@ -78,10 +80,10 @@ class NavigationHandler
     if (node != null)
     {
       mem.reset();
-      if (node.isLeaf() && _isDifferent(((IDiffNode) node).getPair()))
+      if (node.isLeaf() && isDifferent(((IDiffNode) node).getPair()))
       {
-        mem.set(node, _indexOf(node));
-        return _findNextIn(node);
+        mem.set(node, indexOf(node));
+        return findNextIn(node);
       }
     }
 
@@ -89,12 +91,20 @@ class NavigationHandler
       node = mem.difference;
 
     if (node == null)
-      node = _findFirstNode();
+      node = findFirstNode();
 
-    return _findNextIn(node);
+    return node == null ? null : findNextIn(node);
   }
 
-  private TreeNode _findNextIn(TreeNode pNode)
+  /**
+   * Searches the next difference in the given node.
+   * Will be recursive.
+   *
+   * @param pNode Node to search in
+   * @return the next difference or null, if nothing found
+   */
+  @Nullable
+  private TreeNode findNextIn(@NonNull TreeNode pNode)
   {
     TreeNode node;
     int startIndex;
@@ -115,26 +125,35 @@ class NavigationHandler
 
       if (child.isLeaf())
       {
-        if (_isDifferent(((IDiffNode) child).getPair()))
+        if (isDifferent(((IDiffNode) child).getPair()))
         {
           mem.set(child, index);
           return child;
         }
       }
       else
-        return _findNextIn(child);
+        return findNextIn(child);
     }
 
     mem.reset();
-    TreeNode parent = _findNextParent(node);
+    TreeNode parent = findNextParent(node);
 
     if (parent != null)
-      return _findNextIn(parent);
+      return findNextIn(parent);
 
-    return _findNextIn(root);
+    return findNextIn(root);
   }
 
-  private TreeNode _findPrevoiusIn(TreeNode pNode)
+
+  /**
+   * Searches the previous difference in the given node.
+   * Will be recursive.
+   *
+   * @param pNode Node to search in
+   * @return the previous difference or null, if nothing found
+   */
+  @Nullable
+  private TreeNode findPreviousIn(@NonNull TreeNode pNode)
   {
     TreeNode node;
     int startIndex;
@@ -155,25 +174,31 @@ class NavigationHandler
 
       if (child.isLeaf())
       {
-        if (_isDifferent(((IDiffNode) child).getPair()))
+        if (isDifferent(((IDiffNode) child).getPair()))
         {
           mem.set(child, index);
           return child;
         }
       }
       else
-        return _findPrevoiusIn(child);
+        return findPreviousIn(child);
     }
 
     mem.reset();
-    TreeNode parent = _findPrevoiusParent(node);
+    TreeNode parent = findPreviousParent(node);
     if (parent != null)
-      return _findPrevoiusIn(parent);
+      return findPreviousIn(parent);
 
-    return _findPrevoiusIn(root);
+    return findPreviousIn(root);
   }
 
-  private int _indexOf(TreeNode pChild)
+  /**
+   * Searches the index of the given child node.
+   *
+   * @param pChild Child to search for
+   * @return the index, or -1 if not found
+   */
+  private int indexOf(@NonNull TreeNode pChild)
   {
     int index = -1;
     TreeNode p = pChild.getParent();
@@ -188,42 +213,53 @@ class NavigationHandler
     return index;
   }
 
-  private TreeNode _findNextParent(TreeNode pChild)
+  /**
+   * Searches the next node in parent
+   *
+   * @param pChild Child to indicate the current position
+   * @return the next node or the root node
+   */
+  @Nullable
+  private TreeNode findNextParent(@NonNull TreeNode pChild)
   {
     TreeNode p = pChild.getParent();
 
     if (p == null)
-    {
       return root;
-    }
 
-    int index = _indexOf(pChild) + 1;
-
+    int index = indexOf(pChild) + 1;
     if (index < p.getChildCount())
       return p.getChildAt(index);
 
-    return _findNextParent(p);
+    return findNextParent(p);
   }
 
-  private TreeNode _findPrevoiusParent(TreeNode pChild)
+  /**
+   * Searches the previous node in parent
+   *
+   * @param pChild Child to indicate the current position
+   * @return the previous node or the root node
+   */
+  @Nullable
+  private TreeNode findPreviousParent(@NonNull TreeNode pChild)
   {
     TreeNode p = pChild.getParent();
 
     if (p == null)
-    {
       return root;
-    }
 
-    int index = _indexOf(pChild) - 1;
-
+    int index = indexOf(pChild) - 1;
     if (index >= 0)
       return p.getChildAt(index);
 
-
-    return _findPrevoiusParent(p);
+    return findPreviousParent(p);
   }
 
-  private IDiffNode _findFirstNode()
+  /**
+   * @return the first node of the root node, or null if the root has no children
+   */
+  @Nullable
+  private IDiffNode findFirstNode()
   {
     if (root.getChildCount() > 0)
       return (IDiffNode) root.getChildAt(0);
@@ -231,38 +267,57 @@ class NavigationHandler
     return null;
   }
 
-  private IDiffNode _findLastNode()
+  /**
+   * @return the last node of the root node, or null if the root has no children
+   */
+  @Nullable
+  private IDiffNode findLastNode()
   {
     int childCount = root.getChildCount();
     if (childCount > 0)
       return (IDiffNode) root.getChildAt(childCount - 1);
-
     return null;
   }
 
-  private boolean _isDifferent(AbstractPair pPair)
+  /**
+   * Determines, if the given pair is in a "different" state
+   *
+   * @param pPair Pair to check
+   * @return true, if it is in a "different" state
+   */
+  private boolean isDifferent(@Nullable AbstractPair pPair)
   {
     if (pPair != null)
-      return diffStates.contains(pPair.typeOfDiff(EDirection.LEFT)) | diffStates.contains(pPair.typeOfDiff(EDirection.RIGHT));
+      return diffStates.contains(pPair.typeOfDiff(EDirection.LEFT)) ||
+          diffStates.contains(pPair.typeOfDiff(EDirection.RIGHT));
 
     return false;
   }
 
   /**
-   * Hilfskonstrukt, merkt sich den zuletzt gelieferten Node mit Differenz,
-   * sowie dessen index in seinem Parent.
+   * Helper, remembers the last delivered node with differences,
+   * as well as its index in its parent.
    */
-  private static class _Memory
+  private static class Memory
   {
-    public TreeNode difference;
-    public int indexInParent = -1;
+    private TreeNode difference;
+    private int indexInParent = -1;
 
-    public void set(TreeNode pNode, int pIndexInParent)
+    /**
+     * Sets the given node and the appropriate index
+     *
+     * @param pNode          Node to set
+     * @param pIndexInParent Index to set, -1 if no index available
+     */
+    public void set(@Nullable TreeNode pNode, int pIndexInParent)
     {
       difference = pNode;
       indexInParent = pIndexInParent;
     }
 
+    /**
+     * Resets everything inside
+     */
     public void reset()
     {
       difference = null;

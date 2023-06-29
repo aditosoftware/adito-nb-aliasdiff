@@ -2,22 +2,23 @@ package de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.IPropertyFilter;
 import de.adito.aditoweb.system.crmcomponents.annotations.DIFF;
-import de.adito.propertly.core.spi.IProperty;
-import org.jetbrains.annotations.NotNull;
+import de.adito.propertly.core.spi.*;
+import lombok.NonNull;
 
 /**
- * Standardfilter, der nur Properties durchlässt
- * die eine DIFF Annotation besitzen.
- * @see DIFF
+ * Default filter that only allows properties that are annotated with {@link DIFF}
+ *
  * @author t.tasior, 05.03.2018
+ * @author w.glanzer, 29.06.2023 (refactored, translated)
+ * @see DIFF
  */
 public class DefaultPropertyFilter implements IPropertyFilter
 {
 
   @Override
-  public boolean canMatch(@NotNull IProperty<?, ?> pProperty)
+  public boolean test(@NonNull IProperty<?, ?> pProperty)
   {
-    return (pProperty.getDescription().getAnnotation(DIFF.class) != null)
-        | (pProperty.getDescription().getType().getAnnotation(DIFF.class) != null);
+    IPropertyDescription<?, ?> pDescr = pProperty.getDescription();
+    return pDescr.isAnnotationPresent(DIFF.class) || pDescr.getType().isAnnotationPresent(DIFF.class);
   }
 }
