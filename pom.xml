@@ -26,10 +26,47 @@
         <artifactId>nb-adito-interface</artifactId>
         <version>[1.9.8]</version>
       </dependency>
+
+      <!-- Metrics -->
+      <dependency>
+        <groupId>de.adito.nbm</groupId>
+        <artifactId>de-adito-metrics-api</artifactId>
+        <version>RELEASE125-1.9.1</version>
+      </dependency>
+
+      <!-- NetBeans Utils -->
+      <dependency>
+        <groupId>de.adito.nb-modules</groupId>
+        <artifactId>de-adito-netbeans-utilities</artifactId>
+        <version>[RELEASE125-1.9.5]</version>
+        <exclusions>
+          <exclusion>
+            <groupId>de.adito.nbm.wrappers</groupId>
+            <artifactId>lwhttpclient</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpcore</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+
+      <!-- Custom NetBeans Modules -->
+      <dependency>
+        <groupId>org.netbeans.api</groupId>
+        <artifactId>org-netbeans-modules-db</artifactId>
+        <version>[RELEASE125-1.9.0]</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
   <dependencies>
+    <!-- ADITO Interfaces -->
+    <dependency>
+      <groupId>de.adito.nb-modules</groupId>
+      <artifactId>nb-adito-interface</artifactId>
+    </dependency>
+
     <!-- ADITO / Designer Packages -->
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
@@ -40,16 +77,9 @@
           <groupId>de.adito.designer.netbeans</groupId>
           <artifactId>Diff</artifactId>
         </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>de.adito.designer.netbeans</groupId>
-      <artifactId>EntityEditorCommon</artifactId>
-      <version>${designer.version}</version>
-      <exclusions>
         <exclusion>
           <groupId>de.adito.designer.netbeans</groupId>
-          <artifactId>Diff</artifactId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -57,11 +87,23 @@
       <groupId>de.adito.designer.netbeans</groupId>
       <artifactId>DesignerDataObjects</artifactId>
       <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
       <artifactId>DesignerCommonInterface</artifactId>
       <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
@@ -72,17 +114,66 @@
           <groupId>org.eclipse.jdt.core.compiler</groupId>
           <artifactId>ecj</artifactId>
         </exclusion>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
       </exclusions>
     </dependency>
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
       <artifactId>DesignerDataBase</artifactId>
       <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerCommonClasses</artifactId>
+      <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>DesignerCommonGui</artifactId>
+      <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>FileSystem</artifactId>
+      <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
       <artifactId>AditoNetBeansUtil</artifactId>
       <version>${designer.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>de.adito.designer.netbeans</groupId>
+          <artifactId>lwaditonetbeansutilites</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
@@ -92,6 +183,16 @@
     <dependency>
       <groupId>de.adito.designer.netbeans</groupId>
       <artifactId>lwsystem</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>lwswingcommon</artifactId>
+      <version>${designer.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.designer.netbeans</groupId>
+      <artifactId>lwcore</artifactId>
       <version>${designer.version}</version>
     </dependency>
 
@@ -121,6 +222,72 @@
       <artifactId>org-openide-modules</artifactId>
       <version>${netbeans.version}</version>
     </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-dialogs</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-windows</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-api-progress</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-modules-db</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-modules-db-metadata-model</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-modules-projectapi</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-modules-keyring</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-swing-outline</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-filesystems</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-openide-awt</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.netbeans.api</groupId>
+      <artifactId>org-netbeans-modules-projectuiapi-base</artifactId>
+      <version>${netbeans.version}</version>
+    </dependency>
+
+    <!-- NetBeans Utils -->
+    <dependency>
+      <groupId>de.adito.nb-modules</groupId>
+      <artifactId>de-adito-netbeans-utilities</artifactId>
+    </dependency>
+
+    <!-- Metrics -->
+    <dependency>
+      <groupId>de.adito.nbm</groupId>
+      <artifactId>de-adito-metrics-api</artifactId>
+    </dependency>
 
     <!-- Unittests -->
     <dependency>
@@ -147,6 +314,25 @@
       <groupId>de.adito.propertly</groupId>
       <artifactId>propertly.core</artifactId>
       <version>1.0.9</version>
+    </dependency>
+
+    <!-- RxJava -->
+    <dependency>
+      <groupId>io.reactivex.rxjava3</groupId>
+      <artifactId>rxjava</artifactId>
+      <version>3.0.4</version>
+    </dependency>
+    <dependency>
+      <groupId>de.adito.util</groupId>
+      <artifactId>reactive</artifactId>
+      <version>1.1.8</version>
+    </dependency>
+
+    <!-- Guava -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>29.0-jre</version>
     </dependency>
 
     <!-- Lombok for additional annotations -->

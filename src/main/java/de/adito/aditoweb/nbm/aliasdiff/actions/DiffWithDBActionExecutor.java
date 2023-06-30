@@ -1,17 +1,17 @@
 package de.adito.aditoweb.nbm.aliasdiff.actions;
 
-import de.adito.aditoweb.database.general.metainfo.ITableMetadata;
-import de.adito.aditoweb.database.general.metainfo.providers.ITableMetadataProvider;
-import de.adito.aditoweb.designer.dataobjects.data.db.IEntityDBDataObject;
+import de.adito.aditoweb.designer.dataobjects.data.db.*;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
+import de.adito.aditoweb.nbm.aliasdiff.impl.IAliasDiffFacade;
 import de.adito.aditoweb.nbm.designer.commoninterface.dataobjects.IDesignerDataObject;
-import de.adito.aditoweb.nbm.entitydbeditor.actions.AliasDiffUtil;
-import de.adito.aditoweb.nbm.entitydbeditor.dataobjects.EntityGroupDBDataObject;
-import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.AliasDefDBDataModel;
+import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.*;
+import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.EntityGroupDBDataModel;
 import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasDefinitionDataModel;
+import de.adito.propertly.core.spi.IPropertyPitProvider;
 import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 import org.openide.nodes.Node;
+import org.openide.util.Lookup;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 class DiffWithDBActionExecutor
 {
 
+  private final IAliasDiffFacade aliasDiffFacade = Lookup.getDefault().lookup(IAliasDiffFacade.class);
+
   /**
    * Gets called if the action should be executed
    *
@@ -34,34 +36,62 @@ class DiffWithDBActionExecutor
    */
   public void performAction(@Nullable Node[] pActivatedNodes)
   {
-    if (pActivatedNodes == null || pActivatedNodes.length == 0)
+    if (pActivatedNodes == null)
       return;
 
-    //noinspection unchecked Extract the selected dataobject from the lookup
-    Arrays.stream(pActivatedNodes)
-        .map(pNode -> pNode.getLookup().lookup(IDesignerDataObject.class))
+    IEntityGroupDBDataObject groupDataObject = findGroup(pActivatedNodes);
+    if (groupDataObject != null)
+    {
+      // If only tables are selected, then diff the tables - otherwise diff the whole database
+      if (containsOnlyTables(pActivatedNodes))
+        aliasDiffFacade.executeDatabaseDiffWithGUI(collectTables(pActivatedNodes));
+      else
+        aliasDiffFacade.executeDatabaseDiffWithGUI(groupDataObject);
+    }
+  }
 
-        // Retrieve its root model, so we can obtain the entitygroup from
-        .map(pDataObject -> pDataObject.getHierarchy().getValue())
+  /**
+   * Extracts the {@link IEntityGroupDBDataObject} from the given nodes, if possible
+   *
+   * @param pActivatedNodes Nodes that are currently selected
+   * @return the group or null, if none available
+   */
+  @Nullable
+  private IEntityGroupDBDataObject findGroup(@NonNull Node[] pActivatedNodes)
+  {
+    if (pActivatedNodes.length > 0)
+    {
+      IDesignerDataObject<?, ?> ddo = pActivatedNodes[0].getLookup().lookup(IDesignerDataObject.class);
+      if (ddo != null)
+      {
+        EntityGroupDBDataModel groupModel = findGroupModel(ddo);
+        if (groupModel != null)
+          //noinspection unchecked
+          return (IEntityGroupDBDataObject) DataObjectUtil.find(groupModel);
+      }
+    }
 
-        // The root model should be an aliasdefinition model
-        .filter(AliasDefinitionDataModel.class::isInstance)
-        .map(AliasDefinitionDataModel.class::cast)
+    return null;
+  }
 
-        // Extract the sub model, so we can ensure, that this aliasdefinition belongs to a DB alias
-        .map(AliasDefinitionDataModel::getAliasDefinitionSub)
-        .filter(AliasDefDBDataModel.class::isInstance)
-        .map(AliasDefDBDataModel.class::cast)
+  /**
+   * Extracts the {@link EntityGroupDBDataModel} from the given dataobject, if possible
+   *
+   * @param pDataObject DataObject to extract the group from
+   * @return the group model or null, if extraction is not possible
+   */
+  @Nullable
+  private EntityGroupDBDataModel findGroupModel(@NonNull IDesignerDataObject<?, ?> pDataObject)
+  {
+    IPropertyPitProvider<?, ?, ?> value = pDataObject.getHierarchy().getValue();
+    if (value instanceof AliasDefinitionDataModel)
+    {
+      AbstractAliasDefSubDataModel<?> subModel = ((AliasDefinitionDataModel) value).getAliasDefinitionSub();
+      if (subModel instanceof AliasDefDBDataModel)
+        return ((AliasDefDBDataModel) subModel).getEntityGroup();
+    }
 
-        // Retrieve the entitygroup dataobject instance from the db sub model
-        .map(AliasDefDBDataModel::getEntityGroup)
-        .map(DataObjectUtil::get)
-        .filter(EntityGroupDBDataObject.class::isInstance)
-        .map(EntityGroupDBDataObject.class::cast)
-
-        // Start the alias diff workflow on the first valid model we find
-        .findFirst()
-        .ifPresent(pDataObject -> performAliasDiff(pDataObject, containsOnlyTables(pActivatedNodes) ? collectTableNames(pActivatedNodes) : null));
+    return null;
   }
 
   /**
@@ -86,36 +116,21 @@ class DiffWithDBActionExecutor
   }
 
   /**
-   * Collects table names from the array.
+   * Extracts all currently selected tables
    *
-   * @param pActivatedNodes is searched for table objects.
-   * @return always a set, possibly empty.
+   * @param pActivatedNodes Nodes that are currently selected
+   * @return all tables, empty if nothing is selected
    */
   @NonNull
-  private Set<String> collectTableNames(@Nullable Node[] pActivatedNodes)
+  private Set<IEntityDBDataObject<?>> collectTables(@Nullable Node[] pActivatedNodes)
   {
     if (pActivatedNodes == null || pActivatedNodes.length == 0)
       return Set.of();
 
     return Arrays.stream(pActivatedNodes)
-        .map(pNode -> pNode.getLookup().lookup(ITableMetadataProvider.class))
-        .filter(Objects::nonNull)
-        .map(ITableMetadataProvider::getTableMetadata)
-        .filter(Objects::nonNull)
-        .map(ITableMetadata::getName)
+        .map(pNode -> (IEntityDBDataObject<?>) pNode.getLookup().lookup(IEntityDBDataObject.class))
         .filter(Objects::nonNull)
         .collect(Collectors.toSet());
-  }
-
-  /**
-   * Starts the Diff workflow for the given alias and the optionally given table names
-   *
-   * @param pAlias      Alias to diff
-   * @param pTableNames Selected table names
-   */
-  private void performAliasDiff(@NonNull EntityGroupDBDataObject pAlias, @Nullable Set<String> pTableNames)
-  {
-    AliasDiffUtil.performDatabaseDiff(pAlias, pTableNames, pAlias.getProject());
   }
 
 }
