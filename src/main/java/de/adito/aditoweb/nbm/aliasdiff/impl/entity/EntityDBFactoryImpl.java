@@ -74,6 +74,8 @@ public class EntityDBFactoryImpl implements IEntityDBFactory
       EntityGroupDBDataModel root = createNewGroupModel(pConfig.getDefinitionName());
       tables.stream()
           .filter(Objects::nonNull)
+          //sort, so that the returning model is not in random order
+          .sorted(Comparator.comparing(ITableMetadata::getName, String.CASE_INSENSITIVE_ORDER))
           .forEach(pTable -> addTable(root, pTable));
 
       return root;
