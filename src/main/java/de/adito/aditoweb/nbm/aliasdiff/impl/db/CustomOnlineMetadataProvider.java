@@ -43,7 +43,7 @@ public class CustomOnlineMetadataProvider
         .collect(Collectors.toSet());
 
     return readTableMeta(pAlias, pTables, pSchema, pIncludeViews).stream()
-        .filter(pMetadata -> uppercasedNames.contains(pMetadata.getName().toUpperCase(Locale.ROOT)))
+        .filter(pMetadata -> pMetadata == null || uppercasedNames.contains(pMetadata.getName().toUpperCase(Locale.ROOT)))
         .collect(Collectors.toList());
   }
 
@@ -53,7 +53,7 @@ public class CustomOnlineMetadataProvider
    * @param pAliasConfigInfo information about the db connection
    * @param pTables          Name of the tables or null, if all tables should be read
    * @param pSchema          Name of the schema, or null if the default schema is to be used (or any if a default schema does not exist)
-   * @return list of table metadata
+   * @return list of table metadata, may contain null-values if some tables won't exist
    * @throws DatabaseException if something failed
    */
   @NonNull
