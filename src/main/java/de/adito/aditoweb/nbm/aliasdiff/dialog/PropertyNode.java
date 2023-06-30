@@ -44,7 +44,7 @@ public class PropertyNode extends DefaultMutableTreeNode implements IDiffNode
    * @param pRemote      see AbstractPropertyPitMatcher.
    * @param pRightModify right model ald BulkModifyHierarchy
    * @param pReadOnly    see AbstractPropertyPitMatcher.
-   * @see AbstractPropertyPitMatcher
+   * @see PropertyPitMatcher
    */
   public PropertyNode(@Nullable BulkModifyHierarchy<?> pLeftModify, @Nullable EDirection pRemote,
                       @Nullable BulkModifyHierarchy<?> pRightModify, @Nullable EDirection pReadOnly)
