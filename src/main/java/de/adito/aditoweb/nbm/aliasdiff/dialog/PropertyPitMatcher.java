@@ -23,7 +23,7 @@ import java.util.Objects;
  * @see EDirection
  * @see DiffPresenter
  */
-public abstract class AbstractPropertyPitMatcher<L extends IPropertyPitProvider<?, ?, ?>, R extends IPropertyPitProvider<?, ?, ?>>
+public class PropertyPitMatcher<L extends IPropertyPitProvider<?, ?, ?>, R extends IPropertyPitProvider<?, ?, ?>>
 {
   private final IPropertyPit<?, ?, ?> leftPit;
   private final IPropertyFilter filter;
@@ -47,8 +47,8 @@ public abstract class AbstractPropertyPitMatcher<L extends IPropertyPitProvider<
    *                  Null, if both sides can be written
    * @see DIFF
    */
-  protected AbstractPropertyPitMatcher(@NonNull L pLeftPPP, @Nullable IPropertyFilter pFilter, @Nullable EDirection pRemote, @NonNull R pRightPPP,
-                                       @Nullable EDirection pReadOnly)
+  public PropertyPitMatcher(@NonNull L pLeftPPP, @Nullable IPropertyFilter pFilter, @Nullable EDirection pRemote, @NonNull R pRightPPP,
+                            @Nullable EDirection pReadOnly)
   {
     leftbmh = new BulkModifyHierarchy<>(pLeftPPP.getPit().getHierarchy());
     //noinspection rawtypes
