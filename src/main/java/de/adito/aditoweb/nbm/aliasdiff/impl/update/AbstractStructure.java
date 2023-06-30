@@ -75,7 +75,11 @@ abstract class AbstractStructure
   protected String getDefinitionName(@NotNull EntityGroupDBDataObject pDataObject)
   {
     // Entweder suchen wir den Namen im targetAlias
-    return Optional.ofNullable(pDataObject.getTargetAliasName())
+    return Optional.ofNullable(pDataObject.getPropertyPitProvider())
+        .map(pGroupModel -> pGroupModel.getPit().getParent())
+        .filter(AliasDefDBDataModel.class::isInstance)
+        .map(pDefDBModel -> ((AliasDefDBDataModel) pDefDBModel).getPit().getValue(AliasDefDBDataModel.targetAliasName))
+        .map(Strings::emptyToNull)
 
         // Oder wir suchen ihn über den herkömmlichen Weg über den Parent
         .or(() -> Optional.ofNullable(pDataObject.getParent())

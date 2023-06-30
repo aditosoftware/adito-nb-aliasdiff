@@ -7,7 +7,7 @@ import de.adito.aditoweb.core.util.Utility;
 import de.adito.aditoweb.database.general.metainfo.*;
 import de.adito.aditoweb.filesystem.datamodelfs.modellookup.*;
 import de.adito.aditoweb.nbm.aditonetbeansutil.notification.NotifyUtil;
-import de.adito.aditoweb.nbm.designer.commonclasses.SystemDefinitionAliasConfigResolver;
+import de.adito.aditoweb.nbm.aliasdiff.impl.update.sql.SQLExporter;
 import de.adito.aditoweb.nbm.designer.commonclasses.util.SaveUtil;
 import de.adito.aditoweb.nbm.designer.commoninterface.services.editorcontext.IEditorContext;
 import de.adito.aditoweb.nbm.designerdb.api.DatabaseAccessProvider;
