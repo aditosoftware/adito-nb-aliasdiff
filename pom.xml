@@ -24,7 +24,7 @@
       <dependency>
         <groupId>de.adito.nb-modules</groupId>
         <artifactId>nb-adito-interface</artifactId>
-        <version>[1.9.8]</version>
+        <version>[1.9.5]</version>
       </dependency>
 
       <!-- Metrics -->
@@ -313,7 +313,7 @@
     <dependency>
       <groupId>de.adito.propertly</groupId>
       <artifactId>propertly.core</artifactId>
-      <version>1.0.9</version>
+      <version>1.0.8</version>
     </dependency>
 
     <!-- RxJava -->
