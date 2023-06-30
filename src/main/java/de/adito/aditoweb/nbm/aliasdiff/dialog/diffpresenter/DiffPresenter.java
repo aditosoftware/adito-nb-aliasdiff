@@ -4,7 +4,6 @@ import de.adito.aditoweb.common.IButtonInscriptions;
 import de.adito.aditoweb.core.util.lang.Pair;
 import de.adito.aditoweb.designer.dataobjects.data.miscobjects.AliasDefinitionDataObject;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
-import de.adito.aditoweb.nbm.aditonetbeansutil.notification.NotifyUtil;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.EDiff;
 import de.adito.aditoweb.nbm.designer.commoninterface.lookup.editorcontext.IEditorContextProvider;
@@ -15,6 +14,7 @@ import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.*;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.IEntityFieldDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
 import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasDefinitionDataModel;
+import de.adito.notification.INotificationFacade;
 import lombok.*;
 import lombok.extern.java.Log;
 import org.jetbrains.annotations.Nullable;
@@ -60,7 +60,7 @@ public class DiffPresenter
     String title = NbBundle.getMessage(DiffPresenter.class, "LBL_Diff", leftTitle, rightTitle);
     if (pRoot.getChildCount() == 0)
     {
-      NotifyUtil.balloon().info(title, NbBundle.getMessage(DiffPresenter.class, "TXT_Equal_Content"));
+      INotificationFacade.INSTANCE.notify(title, NbBundle.getMessage(DiffPresenter.class, "TXT_Equal_Content"), true, null);
       return;
     }
 
