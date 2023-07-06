@@ -1,116 +1,95 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 
-import de.adito.aditoweb.core.multilanguage.*;
-import org.jetbrains.annotations.*;
-
-import java.util.List;
+import lombok.*;
+import org.jetbrains.annotations.Nullable;
 
 /**
+ * Abstract info to update elements, such as tables, views and columns
+ *
  * @author C.Stadler on 08.02.2017.
+ * @author w.glanzer, 04.07.2023 (refactored, translated)
  */
+@RequiredArgsConstructor
 abstract class AbstractUpdateInfo
 {
-  protected List<PropertyValue> properties;
-  private String errorMessage; // Alles was nicht NULL ist ist ein Fehler
+  /**
+   * Name of the object that should be updated
+   */
+  @Getter
+  @NonNull
   private String objectName;
-  private String parentObjectName;
-  protected ConvenienceTranslator ct;
 
+  /**
+   * Operation, how the object gets updated.
+   * Null, if the kind is not specified yet.
+   */
+  @Nullable
   private UpdateKind updateKind;
 
-  AbstractUpdateInfo(@NotNull List<PropertyValue> pProperties, @NotNull String pObjectName, @Nullable String pParentObjectName, @NotNull UpdateKind pUpdateKind)
+  /**
+   * Message, if something failed during this update operation
+   */
+  @Getter
+  @Setter
+  @Nullable
+  private String errorMessage = null;
+
+  /**
+   * Constructor to specify the object name and the update kind in one call
+   *
+   * @param pObjectName Name of the object
+   * @param pUpdateKind Type of the operation
+   */
+  protected AbstractUpdateInfo(@NonNull String pObjectName, @NonNull UpdateKind pUpdateKind)
   {
-    updateKind = pUpdateKind;
-    properties = pProperties;
-    errorMessage = null;
     objectName = pObjectName;
-    parentObjectName = pParentObjectName;
-    ct = new ConvenienceTranslator(20);
+    updateKind = pUpdateKind;
   }
 
   @Override
-  @NotNull
+  @NonNull
   public String toString()
   {
     return getObjectName() + ": " + getDescription();
   }
 
-  public boolean isSomethingToUpdate()
+  /**
+   * Determines, if this update operation will create a new object.
+   *
+   * @return true, if this operation will create a new object
+   */
+  public boolean isNew()
   {
-    return getDelete() || getNew();
+    return updateKind != null && updateKind.equals(UpdateKind.NEW_OBJECT);
   }
 
-  public String getObjectName()
-  {
-    return objectName;
-  }
-
-  public void setObjectName(String pObjectName)
-  {
-    objectName = pObjectName;
-  }
-
-  public String getParentObjectName()
-  {
-    return parentObjectName;
-  }
-
-  public void setParentObjectName(String pParentObjectName)
-  {
-    parentObjectName = pParentObjectName;
-  }
-
-  public String getErrorMessage()
-  {
-    return errorMessage;
-  }
-
-  public void setErrorMessage(String pErrorMessage)
-  {
-    errorMessage = pErrorMessage;
-  }
-
-  public boolean getDelete()
-  {
-    return updateKind.equals(UpdateKind.DELETE_OBJECT);
-  }
-
-  public void setDelete()
-  {
-    updateKind = UpdateKind.DELETE_OBJECT;
-  }
-
-  public boolean getNew()
-  {
-    return updateKind.equals(UpdateKind.NEW_OBJECT);
-  }
-
+  /**
+   * Sets, that this operation will create a new object
+   */
   public void setNew()
   {
     updateKind = UpdateKind.NEW_OBJECT;
   }
 
-  public boolean getUpdate()
+  /**
+   * @return a human readable string representation of this update operation
+   */
+  @NonNull
+  protected abstract String getDescription();
+
+  /**
+   * Defines the type of this operation
+   */
+  public enum UpdateKind
   {
-    return updateKind.equals(UpdateKind.NEW_OBJECT);
+    /**
+     * Type that defines, that something will be created in database
+     */
+    NEW_OBJECT,
+
+    /**
+     * Type that defines, that something will be deleted in database
+     */
+    DELETE_OBJECT
   }
-
-  public abstract String getDescription();
-
-  protected String getDescription(String pResStringNew, String pResStringDel, String pResStringUpdate, String pNewValue)
-  {
-    switch(updateKind)
-    {
-      case NEW_OBJECT:
-        return ct.translate(pResStringNew);
-      case DELETE_OBJECT:
-        return ct.translate(pResStringDel);
-      case UPDATE_OBJECT:
-        return ct.translate(pResStringUpdate) + ": " + String.format(ct.translate(IStaticResources.DESC_CHANGE), pNewValue);
-      default:
-        return "";
-    }
-  }
-
-  public abstract boolean isAllowed();
 }

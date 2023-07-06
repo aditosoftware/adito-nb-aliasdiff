@@ -1,91 +1,35 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 
-import de.adito.aditoweb.core.multilanguage.IStaticResources;
-import org.jetbrains.annotations.*;
+import lombok.*;
+import org.openide.util.NbBundle;
 
-import java.util.*;
+import java.util.Map;
 
 /**
+ * Type to specify, that a table should be updated
+ *
  * @author C.Stadler on 08.02.2017.
+ * @author w.glanzer, 04.07.2023 (refactored, translated)
  */
 class TableUpdateInfo extends AbstractUpdateInfo
 {
-  Map<String, ColumnUpdateInfo> columnUpdateInfos;
+  /**
+   * Contains all column updates, that should be executed during this table update
+   */
+  @Getter
+  @Setter
+  private Map<String, ColumnUpdateInfo> columnUpdateInfos;
 
-  public TableUpdateInfo(@NotNull String pObjectName, @Nullable String pParentObjectName)
+  public TableUpdateInfo(@NonNull String pObjectName)
   {
-    this(new ArrayList<>(), new HashMap<>(), pObjectName, pParentObjectName, UpdateKind.UNDEFINED);
+    super(pObjectName);
   }
 
-  public TableUpdateInfo(@NotNull List<PropertyValue> pTableProperties,
-                         @NotNull Map<String, ColumnUpdateInfo> pColumnUpdateInfos,
-                         @NotNull String pObjectName, @Nullable String pParentObjectName, @NotNull UpdateKind pUpdateKind)
-  {
-    super(pTableProperties, pObjectName, pParentObjectName, pUpdateKind);
-    columnUpdateInfos = pColumnUpdateInfos;
-  }
-
-  public ColumnUpdateInfo getColumnInfo(@NotNull String pObjectName, @Nullable String pParentObjectName)
-  {
-    return new ColumnUpdateInfo(pObjectName, pParentObjectName);
-  }
-
-  @NotNull
-  @Override
-  public String toString()
-  {
-    return getObjectName() + ":" + getDescription();
-  }
-
+  @NonNull
   @Override
   public String getDescription()
   {
-    return getDescription(IStaticResources.DESC_TABLE_NEW, IStaticResources.DESC_TABLE_DEL, "", "");
+    return NbBundle.getMessage(TableUpdateInfo.class, isNew() ? "TEXT_TableUpdateInfo_TableNew" : "TEXT_TableUpdateInfo_TableDelete");
   }
 
-  @Override
-  public boolean isAllowed()
-  {
-    return !getDelete();
-  }
-
-  public List<PropertyValue> getTableProperties()
-  {
-    return properties;
-  }
-
-  public void setTableProperties(List<PropertyValue> pTableProperties)
-  {
-    properties = pTableProperties;
-  }
-
-  public Map<String, ColumnUpdateInfo> getColumnUpdateInfos()
-  {
-    return columnUpdateInfos;
-  }
-
-  public void setColumnUpdateInfos(Map<String, ColumnUpdateInfo> pColumnUpdateInfos)
-  {
-    columnUpdateInfos = pColumnUpdateInfos;
-  }
-
-  @Override
-  public boolean isSomethingToUpdate()
-  {
-    if (getDelete() || getNew())
-      return true;
-
-    for (Map.Entry<String, ColumnUpdateInfo> o : getColumnUpdateInfos().entrySet())
-    {
-      ColumnUpdateInfo updateInfo = o.getValue();
-
-      if (updateInfo.getDelete())
-        return true;
-
-      if (!updateInfo.getColumnProperties().isEmpty())
-        return true;
-    }
-
-    return false; // Nix zu tun
-  }
 }
