@@ -96,7 +96,7 @@ public class PropertyPair extends AbstractPair
   }
 
   @Override
-  public void createDown(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pParent)
+  public void createDown(@NonNull EDirection pDirection, @Nullable IPropertyPitProvider<?, ?, ?> pParent) //NOSONAR I won't refactor this, because something will break for sure..
   {
     if (pDirection == EDirection.RIGHT && leftProperty != null)
     {
@@ -113,7 +113,7 @@ public class PropertyPair extends AbstractPair
       }
     }
 
-    if ((pDirection == EDirection.LEFT) & (rightProperty != null))
+    if ((pDirection == EDirection.LEFT) && (rightProperty != null))
     {
       if (leftProperty != null)
       {
@@ -185,7 +185,7 @@ public class PropertyPair extends AbstractPair
   }
 
   @Override
-  public void update(@NonNull EDirection pDirection)
+  public void update(@NonNull EDirection pDirection) //NOSONAR I won't refactor this, because something will break for sure..
   {
     // as long as the old value has not been restored, no new one can be set.
     if (restoreHandler != null)

@@ -31,10 +31,10 @@ public class PropertyNode extends DefaultMutableTreeNode implements IDiffNode
   private EDirection remote;
   private BulkModifyHierarchy<?> rightModify; //NOSONAR
   private EDirection readOnly;
-  private final AbstractPair propPair;
+  private final transient AbstractPair propPair;
 
   private final EnumSet<EDiff> set = EnumSet.of(EDiff.DIFFERENT, EDiff.MISSING, EDiff.DELETED);
-  private final DiffStateCollector myCollector = new DiffStateCollector();
+  private final transient DiffStateCollector myCollector = new DiffStateCollector();
 
 
   /**

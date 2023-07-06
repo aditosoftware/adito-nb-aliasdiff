@@ -54,11 +54,11 @@ public class ModuleSystemUtils implements Runnable
       ModuleInfo module = Modules.getDefault().findCodeNameBase(pModuleName);
 
       Field moduleDataField = module.getClass().getSuperclass().getDeclaredField("data");
-      moduleDataField.setAccessible(true);
+      moduleDataField.setAccessible(true); //NOSONAR needed here
       Object moduleData = moduleDataField.get(module);
 
       Field publicPackagesField = moduleData.getClass().getSuperclass().getDeclaredField("publicPackages");
-      publicPackagesField.setAccessible(true);
+      publicPackagesField.setAccessible(true); //NOSONAR needed here
       Object[] publicPackages = (Object[]) publicPackagesField.get(moduleData);
 
       Class<?> export = Class.forName("org.netbeans.Module$PackageExport", true, Modules.getDefault().findCodeNameBase("org.netbeans.bootstrap").getClassLoader());
@@ -67,7 +67,7 @@ public class ModuleSystemUtils implements Runnable
       System.arraycopy(publicPackages, 0, newPublicPackages, 0, publicPackages.length);
       newPublicPackages[newPublicPackages.length - 1] = export.getDeclaredConstructor(String.class, boolean.class).newInstance(pPackageName, false);
 
-      publicPackagesField.set(moduleData, newPublicPackages);
+      publicPackagesField.set(moduleData, newPublicPackages); //NOSONAR needed here
     }
     catch (Throwable t)
     {
@@ -89,10 +89,10 @@ public class ModuleSystemUtils implements Runnable
       replacedSharedObjectRefs.add(SharedClassObject.findObject(pNewActionType, true));
 
       Field valuesField = SharedClassObject.class.getDeclaredField("values");
-      valuesField.setAccessible(true);
+      valuesField.setAccessible(true); //NOSONAR needed here
 
-      //noinspection unchecked,rawtypes
-      Map<Class, Object> values = (Map<Class, Object>) valuesField.get(null);
+      //noinspection unchecked
+      Map<Class<?>, Object> values = (Map<Class<?>, Object>) valuesField.get(null);
 
       values.put(pOldActionType, values.get(pNewActionType));
     }

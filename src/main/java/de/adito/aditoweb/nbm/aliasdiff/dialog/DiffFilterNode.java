@@ -17,7 +17,7 @@ import java.util.*;
  */
 public class DiffFilterNode extends DefaultMutableTreeNode implements IDiffNode
 {
-  private final IDiffNode node;
+  private final transient IDiffNode node;
 
   public DiffFilterNode(@NonNull MutableTreeNode pNode, @NonNull ITreeNodeFilter pFilter)
   {

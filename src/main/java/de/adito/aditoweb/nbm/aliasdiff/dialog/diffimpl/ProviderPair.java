@@ -125,13 +125,13 @@ public class ProviderPair extends AbstractPair
   @Override
   public void deleteDown(@NonNull EDirection pDirection)
   {
-    if (pDirection == EDirection.RIGHT & rightProvider != null)
+    if (pDirection == EDirection.RIGHT && rightProvider != null)
     {
       getHost().deleteDown(pDirection);
       rightProvider = null;
     }
 
-    if (pDirection == EDirection.LEFT & leftProvider != null)
+    if (pDirection == EDirection.LEFT && leftProvider != null)
     {
       getHost().deleteDown(pDirection);
       leftProvider = null;
@@ -367,7 +367,7 @@ public class ProviderPair extends AbstractPair
 
       if (direction == EDirection.LEFT)
       {
-        if (RestoreHandler.isSet(property) & property == null)
+        if (RestoreHandler.isSet(property) && property == null)
         {
           if (leftProvider.getPit().isValid())
           {
@@ -409,7 +409,7 @@ public class ProviderPair extends AbstractPair
       }
       else if (direction == EDirection.RIGHT)
       {
-        if (RestoreHandler.isSet(property) & property == null)
+        if (RestoreHandler.isSet(property) && property == null)
         {
           if (rightProvider.getPit().isValid())
           {

@@ -127,7 +127,7 @@ public class DiffPresenter
    * @return List with all deleted tables and a list of pairs containing the deleted column and the table name
    */
   @NonNull
-  private static Pair<List<String>, List<Pair<String, List<String>>>> extractDeleteCandidates(@NonNull IDiffNode pRoot)
+  private static Pair<List<String>, List<Pair<String, List<String>>>> extractDeleteCandidates(@NonNull IDiffNode pRoot)  //NOSONAR I won't refactor this, because something will break for sure..
   {
     EDirection direction = getDirectionOfLocalReadableModel(pRoot);
 
