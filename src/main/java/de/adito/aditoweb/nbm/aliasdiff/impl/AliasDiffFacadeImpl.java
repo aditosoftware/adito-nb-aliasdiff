@@ -2,14 +2,21 @@ package de.adito.aditoweb.nbm.aliasdiff.impl;
 
 import de.adito.aditoweb.designer.dataobjects.data.db.*;
 import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
+import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffPresenter;
 import de.adito.aditoweb.nbm.aliasdiff.impl.db.IAliasConfigResolverProvider;
 import de.adito.aditoweb.nbm.aliasdiff.impl.entity.IEntityDBFactory;
 import de.adito.aditoweb.nbm.aliasdiff.impl.gui.*;
+import de.adito.aditoweb.nbm.aliasdiff.impl.update.StructureToDBPerformer;
+import de.adito.aditoweb.nbm.designer.commonclasses.util.SaveUtil;
 import de.adito.aditoweb.nbm.designer.commoninterface.dataobjects.IDesignerDataObject;
+import de.adito.aditoweb.nbm.entitydbeditor.dataobjects.EntityGroupDBDataObject;
+import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.AliasDefDBDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
-import de.adito.propertly.core.spi.IProperty;
+import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasDefinitionDataModel;
+import de.adito.notification.INotificationFacade;
+import de.adito.propertly.core.spi.*;
 import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.progress.*;
@@ -41,7 +48,7 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
     if (resolver == null)
       return;
 
-    startDiff(project, DiffNodeCreatorFactory.forSomeTableDBDiff(entityDBFactory, resolver, pTableDataObjects), new DBUpdateHandler());
+    startDiff(project, resolver, DiffNodeCreatorFactory.forSomeTableDBDiff(entityDBFactory, resolver, pTableDataObjects), new DBUpdateHandler());
   }
 
   @Override
@@ -56,7 +63,7 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
     if (resolver == null)
       return;
 
-    startDiff(project, DiffNodeCreatorFactory.forWholeAliasDBDiff(entityDBFactory, resolver, group), new DBUpdateHandler());
+    startDiff(project, resolver, DiffNodeCreatorFactory.forWholeAliasDBDiff(entityDBFactory, resolver, group), new DBUpdateHandler());
   }
 
   /**
@@ -64,11 +71,13 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
    * This dialog allows the user to apply changes to the DB / local
    * and then executes them when clicking OK.
    *
-   * @param pProject       Project that was the origin of the diff event
-   * @param pOperation     Operation that returns a diff node to present in the dialog
-   * @param pUpdateHandler Update Handler that determines the actions, that are possible
+   * @param pProject             Project that was the origin of the diff event
+   * @param pAliasConfigResolver Resolver that allows the resolution of alias definition names during update phase after the dialog
+   * @param pOperation           Operation that returns a diff node to present in the dialog
+   * @param pUpdateHandler       Update Handler that determines the actions, that are possible
    */
-  private void startDiff(@NonNull Project pProject, @NonNull ProgressRunnable<IDiffNode> pOperation, @NonNull IUpdateHandler pUpdateHandler)
+  private void startDiff(@NonNull Project pProject, @NonNull IContextualAliasConfigResolver pAliasConfigResolver,
+                         @NonNull ProgressRunnable<IDiffNode> pOperation, @NonNull IUpdateHandler pUpdateHandler)
   {
     IDiffNode rootNode = BaseProgressUtils.showProgressDialogAndRun(pOperation,
                                                                     NbBundle.getMessage(AliasDiffFacadeImpl.class, "PROGRESS_ExecDBDiffWithTables"),
@@ -79,7 +88,15 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
       return;
 
     // Show the dialog
-    DiffPresenter.show(pProject, rootNode, pUpdateHandler, null, new DiffDBToolTip());
+    DiffPresenter.show(pProject, rootNode, pUpdateHandler, e -> {
+      EDirection remoteSide = rootNode.isRemote(EDirection.RIGHT) ? EDirection.RIGHT : EDirection.LEFT;
+
+      // save everything the user changed in the dialog
+      SaveUtil.saveUnsavedStates(null, true);
+
+      // update model in database, if needed
+      executeUpdatesInDB(pAliasConfigResolver, rootNode, remoteSide);
+    }, new DiffDBToolTip());
   }
 
   /**
@@ -97,6 +114,33 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
         .filter(Objects::nonNull)
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Missing project" + pDataObjects));
+  }
+
+  /**
+   * Executes the updates, that the user did in the given {@link IDiffNode}, in the appropriate database
+   *
+   * @param pAliasConfigResolver Resolver to get the alias config from
+   * @param pNode                Node to check for updates
+   * @param pRemote              Determines, on which side of the diff the remote model was
+   */
+  private void executeUpdatesInDB(@NonNull IContextualAliasConfigResolver pAliasConfigResolver, @NonNull IDiffNode pNode, @NonNull EDirection pRemote)
+  {
+    try
+    {
+      //noinspection unchecked
+      StructureToDBPerformer.perform(pAliasConfigResolver, Optional.ofNullable(pNode.getHierarchy(pRemote))
+          .map(IHierarchy::getValue)
+          .filter(AliasDefinitionDataModel.class::isInstance)
+          .map(pModel -> ((AliasDefinitionDataModel) pModel).getAliasDefinitionSub())
+          .filter(AliasDefDBDataModel.class::isInstance)
+          .map(pModel -> ((AliasDefDBDataModel) pModel).getEntityGroup())
+          .map(pModel -> (EntityGroupDBDataObject) DataObjectUtil.get(pModel))
+          .orElseThrow(() -> new IllegalStateException("Failed to find valid alias definition for node " + pNode.getRootName(pRemote))));
+    }
+    catch (Exception e)
+    {
+      INotificationFacade.INSTANCE.error(e);
+    }
   }
 
   /**
@@ -160,6 +204,5 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
       // Creation / Write of value changes allowed
       return pSource instanceof IProperty;
     }
-
   }
 }

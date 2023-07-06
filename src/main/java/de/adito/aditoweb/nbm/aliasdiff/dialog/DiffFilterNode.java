@@ -1,6 +1,7 @@
 package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.*;
+import de.adito.propertly.core.spi.IHierarchy;
 import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -87,6 +88,13 @@ public class DiffFilterNode extends DefaultMutableTreeNode implements IDiffNode
   public EDiff getDiff(@NonNull EDirection pDirection)
   {
     return node.getDiff(pDirection);
+  }
+
+  @Nullable
+  @Override
+  public IHierarchy<?> getHierarchy(@NonNull EDirection pDirection)
+  {
+    return node.getHierarchy(pDirection);
   }
 
   @NonNull
