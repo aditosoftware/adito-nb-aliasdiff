@@ -16,12 +16,12 @@ import java.awt.*;
  */
 public class DiffDBToolTip extends JToolTip
 {
-  private final _ToolTipPanel toolTipPanel;
+  private final ToolTipPanel toolTipPanel;
 
   public DiffDBToolTip()
   {
     setLayout(new BorderLayout());
-    toolTipPanel = new _ToolTipPanel();
+    toolTipPanel = new ToolTipPanel();
     add(toolTipPanel);
   }
 
@@ -34,9 +34,9 @@ public class DiffDBToolTip extends JToolTip
   /**
    * Explains in a tooltip the colors in the diff dialog as well as the possible changes in the alias data models.
    */
-  private static class _ToolTipPanel extends JPanel
+  private static class ToolTipPanel extends JPanel
   {
-    public _ToolTipPanel()
+    public ToolTipPanel()
     {
       double fill = TableLayoutConstants.FILL;
       double pref = TableLayoutConstants.PREFERRED;

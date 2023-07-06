@@ -135,7 +135,7 @@ public abstract class AbstractPair
    * @return the created model
    */
   @Nullable
-  protected abstract IPropertyPitProvider<?, ?, ?> create(@NonNull EDirection pDirection);
+  protected abstract IPropertyPitProvider<?, ?, ?> create(@NonNull EDirection pDirection); //NOSONAR generics are allowed here
 
   /**
    * Returns the managed object

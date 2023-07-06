@@ -7,7 +7,8 @@ import java.awt.*;
 /**
  * Problem: For the DiffPanel we need the vertical scrollbar once on the left side of the tree and normally on the right.
  * Installing your own layout is only possible if you inherit from ScrollPaneLayout.
- * This source code is almost identical to the original class.
+ * <p>
+ * <b>This source code is almost identical to the original class and therefor sonar warnings won't be fixed here</b>
  *
  * @author t.tasior, 09.02.2018
  * @author w.glanzer, 29.06.2023 (refactored, translated)

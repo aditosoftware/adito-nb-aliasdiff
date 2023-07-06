@@ -8,7 +8,7 @@ import de.adito.aditoweb.system.crmcomponents.majordatamodels.SystemDataModel;
 import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.project.Project;
-import org.openide.DialogDescriptor;
+import org.openide.NotifyDescriptor;
 import org.openide.util.NbBundle;
 import org.openide.util.lookup.ServiceProvider;
 
@@ -32,7 +32,7 @@ public class DefaultAliasConfigResolverProvider implements IAliasConfigResolverP
     //System-Config auswählen
     ServerSystemSelectionPanel panel = new ServerSystemSelectionPanel(pProject);
     panel.showInDialog(NbBundle.getMessage(DefaultAliasConfigResolverProvider.class, "TITLE_SelectSystem"), e -> {
-      if (e.getSource() == DialogDescriptor.OK_OPTION)
+      if (e.getSource() == NotifyDescriptor.OK_OPTION)
       {
         IEditorContext<SystemDataModel> selection = panel.getAliasField().getSelectedItem();
         if (selection != null && selection.isValid())

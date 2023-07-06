@@ -31,8 +31,8 @@ import java.util.stream.Collectors;
 public class CustomOnlineMetadataProvider
 {
   private static final String SCHEMA_NOT_FOUND_STRING = "Failed to retrieve database schema of ";
-  private static Constructor<?> NBTABLEMETA_CONSTR;
-  private static Constructor<?> NBVIEWMETA_CONSTR;
+  private Constructor<?> nbTableMetadataConstructor;
+  private Constructor<?> nbViewMetadataConstructor;
 
   @NonNull
   public List<ITableMetadata> getTableMetaData(@NonNull IAliasConfigInfo pAlias, @NonNull List<String> pTables, @Nullable String pSchema,
@@ -57,7 +57,7 @@ public class CustomOnlineMetadataProvider
    * @throws DatabaseException if something failed
    */
   @NonNull
-  private List<ITableMetadata> readTableMeta(@NonNull IAliasConfigInfo pAliasConfigInfo, @Nullable List<String> pTables,
+  private List<ITableMetadata> readTableMeta(@NonNull IAliasConfigInfo pAliasConfigInfo, @Nullable List<String> pTables,  //NOSONAR I won't refactor this, because something will break for sure..
                                              @Nullable String pSchema, boolean pIncludeViews) throws DatabaseException
   {
     DatabaseConnection connection = DatabaseAccessProvider.getInstance().getConnectionManagement().getConnection(pAliasConfigInfo);
@@ -158,18 +158,18 @@ public class CustomOnlineMetadataProvider
   {
     try
     {
-      if (NBTABLEMETA_CONSTR == null)
+      if (nbTableMetadataConstructor == null)
       {
         Class<?> clazz = Class.forName("de.adito.aditoweb.nbm.designerdb.impl.metadata.online.NBTableMetadata");
-        NBTABLEMETA_CONSTR = clazz.getDeclaredConstructor(Table.class, OnlineMetaDataProvider.IMetadataCallback.class);
-        NBTABLEMETA_CONSTR.setAccessible(true);
+        nbTableMetadataConstructor = clazz.getDeclaredConstructor(Table.class, OnlineMetaDataProvider.IMetadataCallback.class);
+        nbTableMetadataConstructor.setAccessible(true);  //NOSONAR needed here
       }
 
-      return (ITableMetadata) NBTABLEMETA_CONSTR.newInstance(pTable, pCallback);
+      return (ITableMetadata) nbTableMetadataConstructor.newInstance(pTable, pCallback);
     }
     catch (Exception e)
     {
-      throw new RuntimeException(e);
+      throw new IllegalStateException(e);
     }
   }
 
@@ -185,18 +185,18 @@ public class CustomOnlineMetadataProvider
   {
     try
     {
-      if (NBVIEWMETA_CONSTR == null)
+      if (nbViewMetadataConstructor == null)
       {
         Class<?> clazz = Class.forName("de.adito.aditoweb.nbm.designerdb.impl.metadata.online.NBViewMetadata");
-        NBVIEWMETA_CONSTR = clazz.getDeclaredConstructor(View.class, OnlineMetaDataProvider.IMetadataCallback.class);
-        NBVIEWMETA_CONSTR.setAccessible(true);
+        nbViewMetadataConstructor = clazz.getDeclaredConstructor(View.class, OnlineMetaDataProvider.IMetadataCallback.class);
+        nbViewMetadataConstructor.setAccessible(true); //NOSONAR needed here
       }
 
-      return (ITableMetadata) NBVIEWMETA_CONSTR.newInstance(pView, pCallback);
+      return (ITableMetadata) nbViewMetadataConstructor.newInstance(pView, pCallback);
     }
     catch (Exception e)
     {
-      throw new RuntimeException(e);
+      throw new IllegalStateException(e);
     }
   }
 

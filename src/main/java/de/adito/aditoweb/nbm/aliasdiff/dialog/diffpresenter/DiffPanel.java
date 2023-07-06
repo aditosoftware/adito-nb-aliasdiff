@@ -42,10 +42,10 @@ public class DiffPanel extends JComponent
   private static final Integer NEXT = 1;
   private static final String EXPAND = "EXPAND";
 
-  private final IDiffNode root;
-  private final IUpdateHandler updateHandler;
+  private final transient IDiffNode root;
+  private final transient IUpdateHandler updateHandler;
   private final JToolTip userdefinedToolTip;
-  private final IDiffNode topNode;
+  private final transient IDiffNode topNode;
   private DefaultTreeModel model;
   private TreeSelectionModel selectionModel; //NOSONAR
   private ExpansionListener expansionListener; //NOSONAR
@@ -54,8 +54,8 @@ public class DiffPanel extends JComponent
   private BoundedRangeModel verticalModel; //NOSONAR
   private final Border border = new EmptyBorder(0, 4, 0, 4);
 
-  private IDiffNode mouseSelectedNode;
-  private final NavigationHandler navigationHandler;
+  private transient IDiffNode mouseSelectedNode;
+  private final transient NavigationHandler navigationHandler;
   private final Action actionUpdateRight = new ActionUpdate(EDirection.RIGHT);
   private final Action actionUpdateLeft = new ActionUpdate(EDirection.LEFT);
   private final Action actionRestore = new ActionRestore();
@@ -100,7 +100,7 @@ public class DiffPanel extends JComponent
     tlu.add(1, 1, new LeftHeader()); // left - only view
     tlu.add(3, 1, rightHeader); // right - view and computation
     tlu.add(1, 3, createLeftTree());
-    tlu.add(3, 3, _createRightTree());
+    tlu.add(3, 3, createRightTree());
     tlu.add(2, 1, 2, 3, new ButtonBar());
 
     TreePath[] paths = TreeUtil.getPaths(leftTree, true);
@@ -177,7 +177,7 @@ public class DiffPanel extends JComponent
    * @return the right tree as swing component
    */
   @NonNull
-  private JComponent _createRightTree()
+  private JComponent createRightTree()
   {
     final EDirection right = EDirection.RIGHT;
     rightTree = new OverallSelectionTree(model);

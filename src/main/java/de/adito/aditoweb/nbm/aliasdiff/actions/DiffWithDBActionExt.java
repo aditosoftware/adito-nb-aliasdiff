@@ -13,7 +13,7 @@ import org.openide.util.NbBundle;
 public class DiffWithDBActionExt extends DiffWithDBAction
 {
 
-  private final DiffWithDBActionExecutor executor = new DiffWithDBActionExecutor();
+  private final transient DiffWithDBActionExecutor executor = new DiffWithDBActionExecutor();
 
   @Override
   protected void performAction(Node[] pActivatedNodes)

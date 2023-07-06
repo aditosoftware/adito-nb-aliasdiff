@@ -172,7 +172,8 @@ public class DiffNodeCreatorFactory
      * @throws Exception if an error occurred while loading the AliasConfig or creating the entity
      */
     @NonNull
-    protected EntityGroupDBDataModel resolveEntityGroupInDB(@NonNull EntityGroupDBDataModel pLocalAlias, @Nullable Set<String> pTableNames) throws Exception
+    protected EntityGroupDBDataModel resolveEntityGroupInDB(@NonNull EntityGroupDBDataModel pLocalAlias, @Nullable Set<String> pTableNames)
+        throws Exception //NOSONAR generic exception handling is okay here..
     {
       // Read out which database we should read from and get the config
       AliasConfigDataModel config = aliasConfigResolver.getConfigForDefinitionName(pLocalAlias.getPit().getHierarchy().getProperty().getName());

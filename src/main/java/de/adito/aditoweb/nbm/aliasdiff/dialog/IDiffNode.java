@@ -89,7 +89,7 @@ public interface IDiffNode extends TreeNode
    * @return the hierarchy or null, if the node does not belong to any hierarchy
    */
   @Nullable
-  IHierarchy<?> getHierarchy(@NonNull EDirection pDirection);
+  IHierarchy<?> getHierarchy(@NonNull EDirection pDirection); //NOSONAR generics are allowed here
 
   /**
    * Writes the changed values back to the data models
