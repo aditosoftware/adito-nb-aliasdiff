@@ -1,114 +1,32 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 
-import de.adito.aditoweb.core.multilanguage.IStaticResources;
-import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.EntityFieldDBDataModel;
-import org.jetbrains.annotations.*;
-
-import java.util.*;
+import lombok.NonNull;
+import org.openide.util.NbBundle;
 
 /**
+ * Type to specify, that a column should be updated
+ *
  * @author C.Stadler on 08.02.2017.
+ * @author w.glanzer, 04.07.2023 (refactored, translated)
  */
 class ColumnUpdateInfo extends AbstractUpdateInfo
 {
 
-  public ColumnUpdateInfo(@NotNull String pObjectName, @Nullable String pParentObjectName)
+  public ColumnUpdateInfo(@NonNull String pObjectName)
   {
-    this(new ArrayList<>(), pObjectName, pParentObjectName, UpdateKind.UNDEFINED);
+    super(pObjectName);
   }
 
-  public ColumnUpdateInfo(@NotNull List<PropertyValue> pColumnProperties, @NotNull String pObjectName, @Nullable String pParentObjectName, @NotNull UpdateKind pUpdateKind)
+  public ColumnUpdateInfo(@NonNull String pObjectName, @NonNull UpdateKind pUpdateKind)
   {
-    super(pColumnProperties, pObjectName, pParentObjectName, pUpdateKind);
+    super(pObjectName, pUpdateKind);
   }
 
-  public List<PropertyValue> getColumnProperties()
-  {
-    return properties;
-  }
-
-  public void setColumnProperties(List<PropertyValue> pColumnProperties)
-  {
-    properties = pColumnProperties;
-  }
-
+  @NonNull
   @Override
-  public boolean isSomethingToUpdate()
+  protected String getDescription()
   {
-    if (getDelete() || getNew())
-      return true;
-
-    return !getColumnProperties().isEmpty();// Nix zu tun
+    return NbBundle.getMessage(ColumnUpdateInfo.class, isNew() ? "TEXT_ColumnUpdateInfo_ColumnNew" : "TEXT_ColumnUpdateInfo_ColumnDelete");
   }
 
-  public boolean getIndex()
-  {
-    return _getBooleanProperty(EntityFieldDBDataModel.index);
-  }
-
-  public int getSize()
-  {
-    return _getIntProperty(EntityFieldDBDataModel.size);
-  }
-
-  public int getScale()
-  {
-    return _getIntProperty(EntityFieldDBDataModel.scale);
-  }
-
-  public int getDataType()
-  {
-    return _getIntProperty(EntityFieldDBDataModel.columnType);
-  }
-
-  public boolean getPrimarykey()
-  {
-    return _getBooleanProperty(EntityFieldDBDataModel.primaryKey);
-  }
-
-  public boolean getNotNull()
-  {
-    return _getBooleanProperty(EntityFieldDBDataModel.notNull);
-  }
-
-  public boolean getUnique()
-  {
-    return _getBooleanProperty(EntityFieldDBDataModel.isUnique);
-  }
-
-  private boolean _getBooleanProperty(Object pProp)
-  {
-    if (_getProperty(pProp) != null)
-      return (boolean) _getProperty(pProp);
-    return false;
-  }
-
-  private int _getIntProperty(Object pProp)
-  {
-    if (_getProperty(pProp) != null)
-      return (int) _getProperty(pProp);
-    return 0;
-  }
-
-  private Object _getProperty(Object pProp)
-  {
-    for (PropertyValue propertyValue : getColumnProperties())
-    {
-      if (propertyValue != null && propertyValue.getProperty().equals(pProp))
-        return propertyValue.getNewValue();
-    }
-    return null;
-  }
-
-  @Override
-  public String getDescription()
-  {
-    return getDescription(IStaticResources.DESC_COLUMN_NEW, IStaticResources.DESC_COLUMN_DEL, "", "");
-  }
-
-  @Override
-  public boolean isAllowed()
-  {
-    return !getDelete();
-  }
 }

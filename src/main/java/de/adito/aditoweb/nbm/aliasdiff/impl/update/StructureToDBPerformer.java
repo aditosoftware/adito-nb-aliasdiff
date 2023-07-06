@@ -1,454 +1,501 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 
-import de.adito.aditoweb.core.checkpoint.CPH;
-import de.adito.aditoweb.core.checkpoint.exception.mechanics.AditoRuntimeException;
-import de.adito.aditoweb.core.multilanguage.IStaticResources;
-import de.adito.aditoweb.core.util.Utility;
+import com.google.common.base.Strings;
+import de.adito.aditoweb.database.IAliasConfigInfo;
 import de.adito.aditoweb.database.general.metainfo.*;
-import de.adito.aditoweb.filesystem.datamodelfs.modellookup.*;
-import de.adito.aditoweb.nbm.aditonetbeansutil.notification.NotifyUtil;
-import de.adito.aditoweb.nbm.aliasdiff.impl.update.sql.SQLExporter;
-import de.adito.aditoweb.nbm.designer.commonclasses.util.SaveUtil;
-import de.adito.aditoweb.nbm.designer.commoninterface.services.editorcontext.IEditorContext;
-import de.adito.aditoweb.nbm.designerdb.api.DatabaseAccessProvider;
-import de.adito.aditoweb.nbm.entitydbeditor.dataobjects.EntityGroupDBDataObject;
-import de.adito.aditoweb.nbm.entitydbeditor.sqlexport.SQLExporter;
-import de.adito.aditoweb.nbm.entityeditorcommon.utility.IEntitySyncAction;
+import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
+import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
+import de.adito.aditoweb.nbm.designer.commoninterface.dataobjects.IDesignerDataObject;
+import de.adito.aditoweb.nbm.designerdb.api.*;
+import de.adito.aditoweb.nbm.designerdb.impl.metadata.online.NBViewMetadata;
+import de.adito.aditoweb.nbm.entitydbeditor.dataobjects.*;
+import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.AliasDefDBDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.*;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
 import de.adito.aditoweb.system.crmcomponents.datatypes.EDatabaseType;
-import de.adito.aditoweb.system.crmcomponents.majordatamodels.*;
-import de.adito.propertly.core.spi.*;
-import org.jetbrains.annotations.NotNull;
+import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasConfigDataModel;
+import de.adito.notification.INotificationFacade;
+import lombok.*;
+import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.progress.*;
+import org.openide.util.NbBundle;
 
+import java.io.IOException;
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.*;
 
 /**
+ * Modifies the database, that it matches a single alias definition
+ *
  * @author t.tasior, 05.03.2018
+ * @author w.glanzer, 04.07.2023 (refactored, translated)
  */
-public class StructureToDBPerformer extends AbstractStructure implements IEntitySyncAction
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class StructureToDBPerformer
 {
 
-  private final IEditorContext<SystemDataModel> context;
-
-  private String aliasDbName = "";
-  private String schemaName = "";
-
-  public StructureToDBPerformer(EntityGroupDBDataObject pEntityGroupDataObject, IEditorContext<SystemDataModel> pContext)
+  /**
+   * Modified the database, that the given alias definition references, so that the database
+   * has the same structure as the given alias definition afterwards.
+   *
+   * @param pAliasConfigResolver Resolver, to get alias configs from
+   * @param pLocalAlias          Alias to perform the action
+   * @throws Exception if something failed during update
+   */
+  public static void perform(@NonNull IContextualAliasConfigResolver pAliasConfigResolver, @NonNull EntityGroupDBDataObject pLocalAlias) throws Exception
   {
-    super(pEntityGroupDataObject);
-    context = pContext;
+    try
+    {
+      // Fire, that the alias definition is about to synchronize
+      pLocalAlias.startSynchronizing();
+
+      AliasConfigDataModel aliasConfig = pAliasConfigResolver.getConfigForDefinitionName(getDefinitionName(pLocalAlias));
+      EntityGroupDBDataModel entityGroup = pLocalAlias.getPropertyPitProvider();
+      if (entityGroup != null)
+      {
+        // Read structure from database and create a map of update information
+        Map<String, TableUpdateInfo> tableUpdateInfos =
+            BaseProgressUtils.showProgressDialogAndRunLater(new FindOutStructure(entityGroup, aliasConfig),
+                                                            ProgressHandle.createHandle(NbBundle.getMessage(StructureToDBPerformer.class,
+                                                                                                            "TEXT_StructureToDBPerformer_FindOut")),
+                                                            true).get();
+
+        // Execute update information
+        BaseProgressUtils.showProgressDialogAndRunLater(new ExecChangesRunnable(entityGroup, aliasConfig, tableUpdateInfos),
+                                                        ProgressHandle.createHandle(NbBundle.getMessage(StructureToDBPerformer.class,
+                                                                                                        "TEXT_StructureToDBPerformer_Exec")),
+                                                        true).get();
+
+        // show the result
+        printErrorIfNecessary(tableUpdateInfos);
+      }
+    }
+    finally
+    {
+      // Fire, that the alias definition has completed synchronization
+      pLocalAlias.finishSynchronizing();
+    }
   }
 
-  @Override
-  public void sync()
+  /**
+   * Returns the name, that should be used during database compare.
+   * Because of modularization, we need to look for the "targetAliasName" property.
+   *
+   * @param pDataObject DataObject, that should be read
+   * @return the name of the alias or null, if it can't be read
+   */
+  @Nullable
+  private static String getDefinitionName(@NonNull EntityGroupDBDataObject pDataObject)
   {
-    if (context != null)
+    // Search for the "targetAliasName" property
+    return Optional.ofNullable(pDataObject.getPropertyPitProvider())
+        .map(pGroupModel -> pGroupModel.getPit().getParent())
+        .filter(AliasDefDBDataModel.class::isInstance)
+        .map(pDefDBModel -> ((AliasDefDBDataModel) pDefDBModel).getPit().getValue(AliasDefDBDataModel.targetAliasName))
+        .map(Strings::emptyToNull)
+
+        // Read with the common "old" way
+        .or(() -> Optional.ofNullable(pDataObject.getParent())
+            .map(IDesignerDataObject::getParent)
+            .map(IDesignerDataObject::getName))
+
+        // Parent or property is not available -> we do not know, how to handel this anymore..
+        .orElse(null);
+  }
+
+  /**
+   * Shows a balloon that notifies about something went wrong during update execution
+   *
+   * @param pTableUpdateInfos information, that were executed
+   */
+  private static void printErrorIfNecessary(@NonNull Map<String, TableUpdateInfo> pTableUpdateInfos)
+  {
+    pTableUpdateInfos.values().stream()
+        .flatMap(pTableUpdateInfo -> Stream.concat(
+            Stream.ofNullable(pTableUpdateInfo.getErrorMessage()),
+            pTableUpdateInfo.getColumnUpdateInfos().values().stream()
+                .map(AbstractUpdateInfo::getErrorMessage)))
+        .findFirst()
+        .ifPresent(pFirstError -> INotificationFacade.INSTANCE.error(
+            new IOException("Some updates could not be applied to database. See IDE-Log for more information.")));
+  }
+
+  /**
+   * Runnable to read the structure from the database and compare it with the given alias model
+   */
+  @RequiredArgsConstructor
+  private static class FindOutStructure implements ProgressRunnable<Map<String, TableUpdateInfo>>
+  {
+    /**
+     * Alias to compare the structure of the database to
+     */
+    @NonNull
+    private final EntityGroupDBDataModel localAliasModel;
+
+    /**
+     * Alias to read the metadata from
+     */
+    @NonNull
+    private final IAliasConfigInfo aliasConfig;
+
+    @Override
+    public Map<String, TableUpdateInfo> run(ProgressHandle pHandle)
     {
+      Map<String, TableUpdateInfo> tableUpdateInfos = new HashMap<>();
+
       try
       {
-        aliasDbName = _getDatabaseProductName(context);
-        schemaName = _getDatabaseSchema(context);
-        entityGroupDBDataObject.startSynchronizing(); //Mitteilen, dass nun synchronisiert wird - Listener deaktivieren
-        _doHardWork(new SystemDefinitionAliasConfigResolver(context));
+        Map<String, ITableMetadata> metadata = DatabaseAccessProvider.getInstance().getMetadataProvider().getOnline()
+            .getTableMetaData(aliasConfig, true)
+            .stream()
+            .collect(Collectors.toMap(ITableMetadata::getName, pMeta -> pMeta));
+
+        findTablesToCreateInDB(metadata, tableUpdateInfos);
+        findTablesToDeleteInDB(metadata, tableUpdateInfos);
+        handleTablesInModel(metadata, tableUpdateInfos);
       }
       catch (Exception e)
       {
-        NotifyUtil.console().error(e);
+        INotificationFacade.INSTANCE.error(e);
       }
-      finally
-      {
-        entityGroupDBDataObject.finishSynchronizing();
-        SaveUtil.saveUnsavedStates(null, true);
-      }
+
+      return tableUpdateInfos;
     }
-  }
 
-  /**
-   * Aktualisiert alle Tabellen die im Model sind
-   *
-   * @param pMetadata die Liste mit Metadaten für die Tabellen aus der Datenbank
-   * @param pHandle   ProgressHandle für Fortschrittsmeldungen
-   */
-  private void _handleTablesInModel(List<ITableMetadata> pMetadata, ProgressHandle pHandle)
-  {
-    pHandle.switchToDeterminate(100);
-
-    int counter = 1;
-    for (EntityDBDataModel entity : entityGroup.getEntities())
+    /**
+     * Searches all tables, that are not available in the given metdata.
+     * This means, that those tables have to be created in the database afterwards
+     *
+     * @param pMetadata          Metadata of the current database to diff
+     * @param pUpdateInfoResults Result to append the tables to add to
+     */
+    private void findTablesToCreateInDB(@NonNull Map<String, ITableMetadata> pMetadata, @NonNull Map<String, TableUpdateInfo> pUpdateInfoResults)
     {
-      pHandle.progress(ct.translate(IStaticResources.TITLE_PROGRESS_READ) + " " + entity.getName());
-      int progress = (int) ((((double) counter) / pMetadata.size()) * 100);
-      pHandle.progress(progress);
-
-      ITableMetadata table = tableGroup.get(entity.getName());
-
-      TableUpdateInfo tableUpdateInfo = _getTableUpdateInfoByName(entity.getName(), CONTAINER_TYPE.get(table));
-      if (!tableUpdateInfo.getNew())
-      {
-        tableUpdateInfo.setTableProperties(_findTableUpddates(table, entity));
-
-        HashMap<String, ColumnUpdateInfo> map = new HashMap<>();
-        map.putAll(_findColumnsUpdatesPerTable(table, entity));
-        map.putAll(_findColumnsToDelete(table, entity));
-        tableUpdateInfo.setColumnUpdateInfos(map);
-        tableUpdateInfos.put(table.getName(), tableUpdateInfo);
-      }
-
-      counter++;
+      localAliasModel.getEntities().stream()
+          .filter(entity -> !pMetadata.containsKey(entity.getName()))
+          .forEach(pModel -> {
+            TableUpdateInfo tableUpdateInfo = getTableUpdateInfoByName(pModel.getName(), null, pUpdateInfoResults);
+            tableUpdateInfo.setNew();
+            pUpdateInfoResults.put(pModel.getName(), tableUpdateInfo);
+          });
     }
-  }
 
-  private HashMap<String, ColumnUpdateInfo> _findColumnsUpdatesPerTable(ITableMetadata pTable, IEntityDataModel<?, ?> pEntity)
-  {
-    HashMap<String, ColumnUpdateInfo> columnUpdateInfos = new HashMap<>();
-
-    for (IEntityFieldDataModel<?> field : pEntity.getEntityFields())
+    /**
+     * Searches all tables, that are available in the given metdata, but not in the current alias
+     * This means, that those tables have to be deleted from the database afterwards
+     *
+     * @param pMetadata          Metadata of the current database to diff
+     * @param pUpdateInfoResults Result to append the tables to remove to
+     */
+    private void findTablesToDeleteInDB(@NonNull Map<String, ITableMetadata> pMetadata, @NonNull Map<String, TableUpdateInfo> pUpdateInfoResults)
     {
-      boolean existing = false;
-      for (IColumnMetadata columnMetadata : pTable.getColumns())
+      pMetadata.values().forEach(pTableMeta -> {
+        String tableName = pTableMeta.getName();
+        if (localAliasModel.getEntities().stream().noneMatch(pModel -> pModel.getName().equalsIgnoreCase(tableName)))
+          pUpdateInfoResults.put(tableName, getTableUpdateInfoByName(tableName, pTableMeta, pUpdateInfoResults));
+      });
+    }
+
+    /**
+     * Handles the columns, so that those changes will be applied in the database afterwards too.
+     *
+     * @param pMetadata          Metadata of the current database to diff
+     * @param pUpdateInfoResults Result to append the changes to
+     */
+    private void handleTablesInModel(@NonNull Map<String, ITableMetadata> pMetadata, @NonNull Map<String, TableUpdateInfo> pUpdateInfoResults)
+    {
+      for (EntityDBDataModel entity : localAliasModel.getEntities())
       {
-        if (field.getName().equalsIgnoreCase(columnMetadata.getName()))
+        ITableMetadata table = pMetadata.get(entity.getName());
+        TableUpdateInfo tableUpdateInfo = getTableUpdateInfoByName(entity.getName(), table, pUpdateInfoResults);
+        if (!tableUpdateInfo.isNew())
         {
-          // Spalte existiert, updates abklappern
-          columnUpdateInfos.put(columnMetadata.getName(), _findColumnUpdates(columnMetadata, field, pTable));
-          existing = true;
-        }
-      }
-      if (!existing)
-      {
-        // Spalte existiert nicht, Neuanlage
-        columnUpdateInfos.put(field.getName(), new ColumnUpdateInfo(new ArrayList<>(), field.getName(), field.getEntity().getName(),
-                                                                    UpdateKind.NEW_OBJECT));
-      }
-    }
-
-    return columnUpdateInfos;
-  }
-
-  private ColumnUpdateInfo _findColumnUpdates(IColumnMetadata pColumn, IEntityFieldDataModel<?> pField, ITableMetadata pMetadata)
-  {
-    List<PropertyValue> columnUpdates = new ArrayList<>();
-
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.columnType, pField, pColumn.getDatatype()));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.size, pField, pColumn.getSize()));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.scale, pField, pColumn.getScale()));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.notNull, pField, !pColumn.isNullAllowed()));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.primaryKey, pField, pMetadata.getPrimaryKeyColumns().contains(pColumn)));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.index, pField, _isColumnIdexed(pMetadata, pColumn.getName(), false)));
-    columnUpdates.add(_checkIfUpdateNeeded(EntityFieldDBDataModel.isUnique, pField, _isColumnIdexed(pMetadata, pColumn.getName(), true)));
-
-    return new ColumnUpdateInfo(columnUpdates, pField.getName(), pField.getEntity().getName(), UpdateKind.UNDEFINED);
-  }
-
-  private boolean _isColumnIdexed(ITableMetadata pMetadata, String pColumnName, boolean pUniqueNeeded)
-  {
-    for (IIndexMetadata indexMetadata : pMetadata.getIndexes())
-    {
-      for (IColumnMetadata indexColumnMetadata : indexMetadata.getColumns())
-      {
-        if (indexColumnMetadata.getName().equalsIgnoreCase(pColumnName))
-        {
-          return !pUniqueNeeded || indexMetadata.isUnique();
-        }
-      }
-    }
-    return false;
-  }
-
-  private PropertyValue _checkIfUpdateNeeded(IPropertyDescription<?, ?> pProperty, IPropertyPitProvider<?, ?, ?> pModel, Object pNewValue)
-  {
-    if (pModel == null)
-      return new PropertyValue(pProperty, pNewValue);
-
-    //noinspection unchecked,rawtypes
-    Object oldValue = ((IPropertyPit) pModel.getPit()).getProperty(pProperty).getValue();
-
-    if (oldValue == null && pNewValue == null)
-      return null; // Nix zu tun
-
-    if (oldValue == null || pNewValue == null)
-    {
-      return new PropertyValue(pProperty, oldValue); // Vergleichen gibt wenig Sinn wenn NULL
-    }
-
-    if (!oldValue.equals(pNewValue))
-      return new PropertyValue(pProperty, oldValue); // Nur updaten wenn sich was getan hat
-
-    return null;
-  }
-
-  private List<PropertyValue> _findTableUpddates(ITableMetadata pTable, IEntityDataModel<?, EntityDBDataModel> pEntity)
-  {
-    List<PropertyValue> tableUpdates = new ArrayList<>();
-
-    String idColumn = pEntity.getPit().getProperty(EntityDBDataModel.idColumn).getValue();
-    if (!Utility.isNullOrEmptyTrimmedString(idColumn))
-    {
-      boolean pkExists = false;
-      for (IColumnMetadata pk : pTable.getPrimaryKeyColumns())
-      {
-        if (pk.getName().equalsIgnoreCase(idColumn))
-          pkExists = true;
-      }
-      if (!pkExists)
-        tableUpdates.add(new PropertyValue(EntityDBDataModel.idColumn, idColumn));
-    }
-    return tableUpdates;
-  }
-
-  private HashMap<String, ColumnUpdateInfo> _findColumnsToDelete(ITableMetadata pTable, EntityDBDataModel pEntity)
-  {
-    HashMap<String, ColumnUpdateInfo> infoHashMap = new HashMap<>();
-
-    for (IColumnMetadata columnMetadata : pTable.getColumns())
-    {
-      boolean exists = false;
-      for (IEntityFieldDataModel<?> entityField : pEntity.getEntityFields())
-      {
-        if (entityField.getName().equalsIgnoreCase(columnMetadata.getName()))
-          exists = true;
-      }
-      if (!exists)
-        infoHashMap.put(columnMetadata.getName(), new ColumnUpdateInfo(new ArrayList<>(), columnMetadata.getName(), pTable.getName(), UpdateKind.DELETE_OBJECT));
-    }
-
-    return infoHashMap;
-  }
-
-  private void _findTablesToDelete(List<ITableMetadata> pMetadata)
-  {
-    for (ITableMetadata meta : pMetadata)
-    {
-      String tableName = meta.getName();
-      boolean exists = false;
-      for (EntityDBDataModel entityDBDataModel : entityGroup.getEntities())
-      {
-        if (entityDBDataModel.getName().equalsIgnoreCase(tableName))
-          exists = true;
-      }
-      if (!exists)
-      {
-        TableUpdateInfo tableUpdateInfo = _getTableUpdateInfoByName(tableName, CONTAINER_TYPE.get(meta));
-        tableUpdateInfo.setDelete();
-        tableUpdateInfos.put(tableName, tableUpdateInfo);
-      }
-    }
-  }
-
-
-  private String _getDatabaseSchema(IEditorContext<SystemDataModel> pAliasEditorContext) throws ServerIdResolveException, AliasConfigNotFoundException
-  {
-    String name = getDefinitionName(entityGroupDBDataObject);
-    if (name != null)
-    {
-      return new SystemDefinitionAliasConfigResolver(pAliasEditorContext)
-          .getConfigForDefinitionName(name)
-          .getAliasConfigProperties()
-          .getOrDefault("schema", "");
-    }
-    return "";
-  }
-
-  private String _getDatabaseProductName(IEditorContext<SystemDataModel> pAliasEditorContext) throws AliasConfigNotFoundException, ServerIdResolveException
-  {
-    SystemDefinitionAliasConfigResolver resolver = new SystemDefinitionAliasConfigResolver(pAliasEditorContext);
-    String name = getDefinitionName(entityGroupDBDataObject);
-    if (name != null)
-    {
-      AliasConfigDataModel cfg = resolver.getConfigForDefinitionName(name);
-      int databaseType = cfg.getDatabaseType();
-      return EDatabaseType.getFromDbType(databaseType).getDatabaseProductName();
-    }
-    return EDatabaseType.NO_DATABASE.getDatabaseProductName();
-  }
-
-  /**
-   * Führt die eigentliche Arbeit aus
-   *
-   * @param pResolver SystemDefinitionAliasConfigResolver
-   * @throws Exception wenn es einen Fehler gab
-   */
-  private void _doHardWork(SystemDefinitionAliasConfigResolver pResolver) throws Exception
-  {
-    // Auslesen starten (im Hintergrund mit Progress)
-    _FindOutStructure findOutStructure = new _FindOutStructure(pResolver);
-    String progressTitel = ct.translate(IStaticResources.TITLE_EXPORT_DATABASE_STRUCTURE);
-    ProgressHandle handle = ProgressHandle.createHandle(progressTitel);
-    BaseProgressUtils.showProgressDialogAndRunLater(findOutStructure, handle, true).get();
-
-    // Änderungen umsetzen !
-    _ExecChanges execChanges = new _ExecChanges(pResolver);
-    progressTitel = ct.translate(IStaticResources.TITLE_EXEC_STRUCTURE_TO_DB);
-    handle = ProgressHandle.createHandle(progressTitel);
-    BaseProgressUtils.showProgressDialogAndRunLater(execChanges, handle, true).get();
-
-    _showResult();
-  }
-
-  private void _showResult()
-  {
-    List<String> em = new ArrayList<>();
-
-    for (String table : (new TreeSet<>(tableUpdateInfos.keySet())))
-    {
-      TableUpdateInfo tableUpdateInfo = tableUpdateInfos.get(table);
-      String tableUpdateInfoErrorMessage = tableUpdateInfo.getErrorMessage();
-      if (tableUpdateInfoErrorMessage != null && !tableUpdateInfoErrorMessage.isEmpty())
-      {
-        em.add(tableUpdateInfoErrorMessage);
-
-        for (String column : (new TreeSet<>(tableUpdateInfo.getColumnUpdateInfos().keySet())))
-        {
-          ColumnUpdateInfo columnUpdateInfo = tableUpdateInfo.getColumnUpdateInfos().get(column);
-          String columnUpdateInfoErrorMessage = columnUpdateInfo.getErrorMessage();
-          if (columnUpdateInfoErrorMessage != null && !columnUpdateInfoErrorMessage.isEmpty())
-            em.add(columnUpdateInfoErrorMessage);
+          Map<String, ColumnUpdateInfo> map = new HashMap<>();
+          findColumnsToCreateInDB(table, entity, map);
+          findColumnToDeleteInDB(table, entity, map);
+          tableUpdateInfo.setColumnUpdateInfos(map);
+          pUpdateInfoResults.put(table.getName(), tableUpdateInfo);
         }
       }
     }
 
-    if (!em.isEmpty())
+    /**
+     * Searches columns, that are available in the local model but are not available in the db
+     *
+     * @param pTableMeta         Metadata in database
+     * @param pTable             Table in local alias
+     * @param pUpdateInfoResults Result to append the columns to add to
+     */
+    private void findColumnsToCreateInDB(@NonNull ITableMetadata pTableMeta, @NonNull IEntityDataModel<?, ?> pTable,
+                                         @NonNull Map<String, ColumnUpdateInfo> pUpdateInfoResults)
     {
-      CPH.checkPoint(20, 862, em.toArray(String[]::new), CPH.OK_DIALOG);
+      pTable.getEntityFields().forEach(pColumn -> {
+        String columnName = pColumn.getName();
+        if (pTableMeta.getColumns().stream().noneMatch(pColumnMeta -> columnName.equalsIgnoreCase(pColumnMeta.getName())))
+          pUpdateInfoResults.put(columnName, new ColumnUpdateInfo(columnName, AbstractUpdateInfo.UpdateKind.NEW_OBJECT));
+      });
+    }
+
+    /**
+     * Searches columns, that are available in the db, but should be deleted
+     * because they are not available in the local alias
+     *
+     * @param pTableMeta         Metadata in database
+     * @param pTable             Table in local alias
+     * @param pUpdateInfoResults Result to append the columns to delete to
+     */
+    private void findColumnToDeleteInDB(@NonNull ITableMetadata pTableMeta, @NonNull IEntityDataModel<?, ?> pTable,
+                                        @NonNull Map<String, ColumnUpdateInfo> pUpdateInfoResults)
+    {
+      pTableMeta.getColumns().forEach(pColumnMeta -> {
+        String columnName = pColumnMeta.getName();
+        if (pTable.getEntityFields().stream().noneMatch(pColumn -> columnName.equalsIgnoreCase(pColumn.getName())))
+          pUpdateInfoResults.put(columnName, new ColumnUpdateInfo(columnName, AbstractUpdateInfo.UpdateKind.DELETE_OBJECT));
+      });
+    }
+
+    /**
+     * Returns the update info, that belongs to a table / view with the given name.
+     * If it is not created yet, then a new update info will be created
+     *
+     * @param pName              Name to search
+     * @param pTableMeta         Metadata to create the update info for.
+     *                           Null, if a update info should be created, that does not already exist in db
+     * @param pUpdateInfoResults Result to get the current info from
+     * @return the already / newly created info
+     */
+    @NonNull
+    private TableUpdateInfo getTableUpdateInfoByName(@NonNull String pName, @Nullable ITableMetadata pTableMeta,
+                                                     @NonNull Map<String, TableUpdateInfo> pUpdateInfoResults)
+    {
+      // Search, if already something in result set
+      TableUpdateInfo tableUpdateInfo = pUpdateInfoResults.get(pName);
+      if (tableUpdateInfo == null)
+      {
+        // if it is a view, then we should create a view update info
+        if (pTableMeta instanceof NBViewMetadata)
+          tableUpdateInfo = new ViewUpdateInfo(pName);
+        else
+          // if it is not a view, than it may be null or a table
+          tableUpdateInfo = new TableUpdateInfo(pName);
+      }
+
+      return tableUpdateInfo;
     }
   }
 
   /**
-   * Runnable für das Auslesen aus der Datenbank
+   * Runnable that executes the given changes on the given alias
    */
-  private class _FindOutStructure implements ProgressRunnable<Boolean>
+  @RequiredArgsConstructor
+  private static class ExecChangesRunnable implements ProgressRunnable<Void>
   {
-    private final SystemDefinitionAliasConfigResolver systemDefinitionAliasConfigResolver;
 
-    public _FindOutStructure(SystemDefinitionAliasConfigResolver pSystemDefinitionAliasConfigResolver)
-    {
-      systemDefinitionAliasConfigResolver = pSystemDefinitionAliasConfigResolver;
-    }
+    /**
+     * Local alias to write the changes to
+     */
+    @NonNull
+    private final EntityGroupDBDataModel localAliasModel;
+
+    /**
+     * Alias to write the changes to
+     */
+    @NonNull
+    private final IAliasConfigInfo aliasConfig;
+
+    /**
+     * Changes to execute
+     */
+    @NonNull
+    private final Map<String, TableUpdateInfo> tableUpdateInfos;
 
     @Override
-    public Boolean run(ProgressHandle pHandle)
+    public Void run(ProgressHandle pHandle)
     {
       try
       {
-        List<ITableMetadata> metadata = collectTableMetadata(systemDefinitionAliasConfigResolver, entityGroup);
-        tableUpdateInfos = new HashMap<>();
+        // Set progress to the correct value, so the user can track the current progress amount
+        pHandle.switchToDeterminate(tableUpdateInfos.size());
 
-        _findNewTablesForDB(metadata);
-        _findTablesToDelete(metadata);
-        _fillTableGroup(metadata);
-        _handleTablesInModel(metadata, pHandle);
+        // Execute changes
+        DatabaseAccessProvider.getInstance().getConnectionManagement().withJDBCConnection(aliasConfig, pCon -> {
+          // do nothing, if the connection is null
+          if (pCon == null)
+            return;
 
-        return true;
-      }
-      catch (Exception pE)
-      {
-        NotifyUtil.console().error(pE);
-        return false;
-      }
-    }
+          String aliasDbName = EDatabaseType.getFromDbType(aliasConfig.getDatabaseType()).getDatabaseProductName();
+          String schemaName = aliasConfig.getAliasConfigProperties().getOrDefault("schema", "");
 
-    private void _fillTableGroup(List<ITableMetadata> pMetadata)
-    {
-      //Map<String, ITableMetadata> map = new HashMap<>();
-      for (ITableMetadata table : pMetadata)
-        tableGroup.put(table.getName(), table);
-    }
-
-    private void _findNewTablesForDB(List<ITableMetadata> pMetadata)
-    {
-      List<String> namesFromDB = pMetadata.stream().map(ITableMetadata::getName).collect(Collectors.toList());
-      List<EntityDBDataModel> tablesToAdd = entityGroup.getEntities().stream()
-          .filter(entity -> !namesFromDB.contains(entity.getName()))
-          .collect(Collectors.toList());
-
-      for (EntityDBDataModel entityDBDataModel : tablesToAdd)
-      {
-        TableUpdateInfo tableUpdateInfo = _getTableUpdateInfoByName(entityDBDataModel.getName(), CONTAINER_TYPE.TABLE);
-        tableUpdateInfo.setNew();
-        tableUpdateInfos.put(entityDBDataModel.getName(), tableUpdateInfo);
-      }
-    }
-  }
-
-  /**
-   * Runnable für das umsetzen der DB-Änderungen
-   */
-  private class _ExecChanges implements ProgressRunnable<Boolean>
-  {
-    private final SystemDefinitionAliasConfigResolver systemDefinitionAliasConfigResolver;
-
-    public _ExecChanges(SystemDefinitionAliasConfigResolver pSystemDefinitionAliasConfigResolver)
-    {
-      systemDefinitionAliasConfigResolver = pSystemDefinitionAliasConfigResolver;
-    }
-
-    @Override
-    public Boolean run(ProgressHandle pHandle)
-    {
-      try
-      {
-        // DB-Verbindung aufbauen
-        //noinspection ConstantConditions wird im catch abgefangen
-        AliasConfigDataModel aliasConfig = systemDefinitionAliasConfigResolver.getConfigForDefinitionName(getDefinitionName(entityGroupDBDataObject));
-
-        pHandle.switchToDeterminate(100);
-
-        return DatabaseAccessProvider.getInstance().getConnectionManagement().withJDBCConnection(aliasConfig, pCon -> {
-          int counter = 1;
-
-          for (String tableName : tableUpdateInfos.keySet())
+          AtomicInteger progressCounter = new AtomicInteger(0);
+          for (Map.Entry<String, TableUpdateInfo> tableUpdateEntry : tableUpdateInfos.entrySet())
           {
-            pHandle.progress(ct.translate(IStaticResources.TITLE_PROGRESS_UPDATE) + " " + tableName);
-            int progress = (int) ((((double) counter) / tableUpdateInfos.keySet().size()) * 100);
-            pHandle.progress(progress);
+            String tableName = tableUpdateEntry.getKey();
+            TableUpdateInfo tableUpdateInfo = tableUpdateEntry.getValue();
 
-            _updateTable(tableName, pCon);
+            // Update Progress to display the tablename
+            pHandle.progress(NbBundle.getMessage(ExecChangesRunnable.class, "TEXT_ExecChangesRunnable_Progress", tableName),
+                             progressCounter.incrementAndGet());
 
-            counter++;
+            // execute table changes
+            execChangesInTable(aliasDbName, schemaName, pCon, tableName, tableUpdateInfo);
           }
-
-          return true;
         });
       }
       catch (Exception e)
       {
-        NotifyUtil.console().error(e); //Fehler werden sonst verschluckt
-        return false;
+        INotificationFacade.INSTANCE.error(e);
       }
+
+      // no result, just return
+      return null;
     }
 
-    private void _updateTable(String pTableName, Connection pConn)
+    /**
+     * Executes the given update infos on the table with the given name
+     *
+     * @param pDbName          Name of the DBMS to execute the changes in
+     * @param pSchemaName      Name of the schema to execute the changes in
+     * @param pCon             Connection to execute the changes
+     * @param pTableName       Name of the table to execute the changes
+     * @param pTableUpdateInfo Changes to execute
+     * @throws DatabaseException if something during the execution failed
+     */
+    private void execChangesInTable(@NonNull String pDbName, @NonNull String pSchemaName, @NonNull Connection pCon,
+                                    @NonNull String pTableName, @NonNull TableUpdateInfo pTableUpdateInfo)
+        throws DatabaseException
     {
-      TableUpdateInfo tableUpdateInfo = tableUpdateInfos.get(pTableName);
-      EntityDBDataModel entityDBDataModel = _findEntityDBDataModel(pTableName, tableUpdateInfo);
-
-      // Tabellenspalten updaten
-      for (String columnName : tableUpdateInfo.getColumnUpdateInfos().keySet())
+      // Update table columns
+      for (Map.Entry<String, ColumnUpdateInfo> columnUpdateEntry : pTableUpdateInfo.getColumnUpdateInfos().entrySet())
       {
-        _updateColumn(pTableName, tableUpdateInfo, columnName, tableUpdateInfo.getColumnUpdateInfos().get(columnName), pConn);
+        String columnName = columnUpdateEntry.getKey();
+        ColumnUpdateInfo columnUpdateInfo = columnUpdateEntry.getValue();
+        if (columnUpdateInfo.isNew())
+        {
+          EntityFieldDBDataModel column = findEntityFieldByName(localAliasModel, pTableName, columnName);
+          if (column != null)
+            runSQL(columnUpdateInfo, pCon, generateColumnSQL(pDbName, pSchemaName, pTableName, column));
+        }
       }
-      tableUpdateInfo.setErrorMessage(_execUpdate(_createNewTable(pTableName, tableUpdateInfo, entityDBDataModel), pConn));
+
+      // Update whole table
+      if (pTableUpdateInfo.isNew())
+        runSQL(pTableUpdateInfo, pCon, generateTableSQL(pDbName, pSchemaName, pTableName,
+                                                        findEntityByName(localAliasModel, pTableName)));
     }
 
-    private void _updateColumn(@NotNull String pTableName, @NotNull TableUpdateInfo pTableUpdateInfo, @NotNull String pColumnName,
-                               @NotNull ColumnUpdateInfo pColumnUpdateInfo, @NotNull Connection pConn)
+    /**
+     * Searches an {@link EntityDBDataModel} in the given alias, identified by the given table name
+     *
+     * @param pAlias     Alias to search in
+     * @param pTableName Name of the table to search for
+     * @return the table or null, if not found
+     */
+    @Nullable
+    private EntityDBDataModel findEntityByName(@NonNull EntityGroupDBDataModel pAlias, @NonNull String pTableName)
     {
-      if (pColumnUpdateInfo.getNew())
-        pColumnUpdateInfo.setErrorMessage(_execUpdate(_createNewColumn(pTableName, pTableUpdateInfo, pColumnUpdateInfo, pColumnName) + ";", pConn));
-      else if (pColumnUpdateInfo.isSomethingToUpdate())
-      {
-        pColumnUpdateInfo.setErrorMessage(_execUpdate(_modifyColumn(pTableName, pColumnUpdateInfo, pColumnName), pConn));
-      }
+      return pAlias.getEntities().stream()
+          .filter(pEntity -> pEntity.getName().equalsIgnoreCase(pTableName))
+          .findFirst()
+          .orElse(null);
     }
 
-    private String _execUpdate(String pSql, Connection pConn)
+    /**
+     * Searches an {@link EntityFieldDBDataModel} in the given alias, identified by the given table and column name
+     *
+     * @param pAlias      Alias to search in
+     * @param pTableName  Name of the table to search for
+     * @param pColumnName Name of the column to search for
+     * @return the entity field or null, if not found
+     */
+    @Nullable
+    private EntityFieldDBDataModel findEntityFieldByName(@NonNull EntityGroupDBDataModel pAlias, @NonNull String pTableName, @NonNull String pColumnName)
+    {
+      EntityDBDataModel entityDBDataModel = findEntityByName(pAlias, pTableName);
+      if (entityDBDataModel != null)
+        return entityDBDataModel.getEntityFields().stream()
+            .filter(EntityFieldDBDataModel.class::isInstance)
+            .filter(pField -> pField.getName().equalsIgnoreCase(pColumnName))
+            .map(EntityFieldDBDataModel.class::cast)
+            .findFirst()
+            .orElse(null);
+      return null;
+    }
+
+    /**
+     * Generates a SQL, that will create the given table in the given schema.
+     * If the given entity structure is not null, then the columns will be created too
+     *
+     * @param pDbName     Name of the DBMS to generate the SQL for
+     * @param pSchemaName Name of the schema to create the table in
+     * @param pTableName  Name of the table to create
+     * @param pEntity     Structure to create inside, null if nothing additional should be created (like indices, primary keys, ...)
+     * @return the SQL to execute
+     * @throws DatabaseException if the creation of the SQL failed
+     */
+    @NonNull
+    private String generateTableSQL(@NonNull String pDbName, @NonNull String pSchemaName, @NonNull String pTableName,
+                                    @Nullable EntityDBDataModel pEntity)
+        throws DatabaseException
+    {
+      List<IColumnMetadata> columns = new LinkedList<>();
+      List<IColumnMetadata> pkColumns = new LinkedList<>();
+      List<IColumnMetadata> idxColumns = new LinkedList<>();
+
+      if (pEntity != null)
+      {
+        for (IEntityFieldDataModel<?> entityField : pEntity.getEntityFields())
+        {
+          EntityFieldDBDataModel fieldModel = (EntityFieldDBDataModel) entityField;
+          EntityFieldDBDataObject fieldObj = (EntityFieldDBDataObject) DataObjectUtil.get(entityField);
+          IColumnMetadata metadata = fieldObj.getColumnMetadata();
+          columns.add(metadata);
+          if (Boolean.TRUE == fieldModel.getPrimaryKey())
+            pkColumns.add(metadata);
+          if (Boolean.TRUE == fieldModel.getIndex())
+            idxColumns.add(metadata);
+        }
+      }
+
+      return "-- table " + pTableName + "\n" + DatabaseAccessProvider.getInstance().getDDLBuilder()
+          .getCreateTableDDL(pDbName, pSchemaName, pTableName, columns, pkColumns, idxColumns);
+    }
+
+    /**
+     * Generates a SQL, that will insert the given column metadata into the given table
+     *
+     * @param pDbName      Name of the DBMS to generate the SQL for
+     * @param pSchemaName  Name of the schema to retrieve the table from
+     * @param pTableName   Name of the table to create the column in
+     * @param pEntityField Metadata of the column to create
+     * @return the SQL to execute
+     * @throws DatabaseException if the creation of the SQL failed
+     */
+    @NonNull
+    private String generateColumnSQL(@NonNull String pDbName, @NonNull String pSchemaName, @NonNull String pTableName,
+                                     @NonNull EntityFieldDBDataModel pEntityField)
+        throws DatabaseException
+    {
+      IColumnMetadata metadata = ((EntityFieldDBDataObject) DataObjectUtil.get(pEntityField)).getColumnMetadata();
+      if (metadata == null)
+        return ";";
+
+      return DatabaseAccessProvider.getInstance().getDDLBuilder().getCreateColumnDDL(pDbName, pSchemaName, pTableName, metadata) + ";";
+    }
+
+    /**
+     * Executes the given SQL on the given connection.
+     * If something failed, then the error message will be written to the given update info
+     *
+     * @param pSource Source of the SQL, that receives the error message
+     * @param pConn   Connection to execute the SQL
+     * @param pSql    SQL to execute
+     */
+    private void runSQL(@NonNull AbstractUpdateInfo pSource, @NonNull Connection pConn, @NonNull String pSql)
     {
       String msg = null;
-      if (!pSql.isEmpty())
+      if (!pSql.trim().isEmpty())
       {
         try
         {
@@ -457,7 +504,7 @@ public class StructureToDBPerformer extends AbstractStructure implements IEntity
           {
             String s = str.nextToken();
             s = s.replace("\n\n", "\n");
-            if (!s.isEmpty() && (!s.equals("\n")))
+            if (!s.isEmpty() && !s.equals("\n"))
             {
               msg = s + "\n";
               try (PreparedStatement statement = pConn.prepareStatement(s))
@@ -467,86 +514,18 @@ public class StructureToDBPerformer extends AbstractStructure implements IEntity
                 if (!pConn.getAutoCommit())
                   pConn.commit();
               }
-              return null; // Bei Erfolg kein Fehler...
+              return;
             }
           }
         }
         catch (Exception e)
         {
-          NotifyUtil.console().error(e);
+          INotificationFacade.INSTANCE.error(e);
           msg += e.getMessage();
         }
       }
-      return msg;
-    }
 
-    private String _createNewTable(String pTableName, TableUpdateInfo pTableUpdateInfo, EntityDBDataModel pEntityDBDataModel)
-    {
-      if (pTableUpdateInfo.getNew())
-        return SQLExporter.generateTableSQL(pTableName, aliasDbName, pEntityDBDataModel.getEntityFields(), schemaName);
-
-      return "";
-    }
-
-    private String _createNewColumn(@NotNull String pTableName, @NotNull TableUpdateInfo pTableUpdateInfo, @NotNull ColumnUpdateInfo pColumnUpdateInfo,
-                                    @NotNull String pColumnName)
-    {
-      if (pColumnUpdateInfo.getNew())
-        return SQLExporter.generateColumnSQL(pTableName, aliasDbName, _findEntityFieldDataModel(pTableName, pTableUpdateInfo, pColumnName), schemaName);
-      return "";
-    }
-
-    private String _modifyColumn(String pTableName, ColumnUpdateInfo pColumnUpdateInfo, String pColumnName)
-    {
-      String sql = "";
-      try
-      {
-        if (pColumnUpdateInfo.getIndex())
-          sql += _createNewIndex(pTableName, pColumnName, pColumnUpdateInfo.getUnique());
-      }
-      catch (Exception e)
-      {
-        throw new AditoRuntimeException(e, 20, 855);
-      }
-
-
-      return sql;
-    }
-
-    private String _createNewIndex(String pTableName, String pColumnName, boolean pIsUnique)
-    {
-      String sql = "";
-      try
-      {
-        String indexName = _getIndexNameForColumn(pTableName, pColumnName);
-        if (indexName.isEmpty())
-        {
-          sql += DatabaseAccessProvider.getInstance().getDDLBuilder().getCreateIndexDDL(aliasDbName, schemaName, pTableName, pColumnName, pIsUnique);
-          sql += ";\n";
-        }
-      }
-      catch (Exception e)
-      {
-        throw new AditoRuntimeException(e, 20, 858);
-      }
-      return sql;
-    }
-
-    private String _getIndexNameForColumn(String pTableName, String pColumnName)
-    {
-      ITableMetadata tableMetadata = tableGroup.get(pTableName);
-      List<IIndexMetadata> indexes = tableMetadata.getIndexes();
-      String indexName = "";
-
-      for (IIndexMetadata indexMetadata : indexes)
-      {
-        for (IColumnMetadata columnMetadata : indexMetadata.getColumns())
-        {
-          if (columnMetadata.getName().equalsIgnoreCase(pColumnName))
-            indexName = indexMetadata.getName();
-        }
-      }
-      return indexName;
+      pSource.setErrorMessage(msg);
     }
   }
 }
