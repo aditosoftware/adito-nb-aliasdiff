@@ -2,6 +2,7 @@ package de.adito.aditoweb.nbm.aliasdiff.dialog;
 
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffimpl.*;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffPresenter;
+import de.adito.propertly.core.spi.IHierarchy;
 import lombok.NonNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -80,6 +81,15 @@ public interface IDiffNode extends TreeNode
    */
   @NonNull
   EDiff getDiff(@NonNull EDirection pDirection);
+
+  /**
+   * Searches the hierarchy that the node on the given side references
+   *
+   * @param pDirection side to get the hierarchy from
+   * @return the hierarchy or null, if the node does not belong to any hierarchy
+   */
+  @Nullable
+  IHierarchy<?> getHierarchy(@NonNull EDirection pDirection);
 
   /**
    * Writes the changed values back to the data models

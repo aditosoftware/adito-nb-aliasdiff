@@ -130,6 +130,16 @@ public class PropertyNode extends DefaultMutableTreeNode implements IDiffNode
     return propPair.typeOfDiff(pDirection);
   }
 
+  @Nullable
+  @Override
+  public IHierarchy<?> getHierarchy(@NonNull EDirection pDirection)
+  {
+    PropertyNode parentNode = parent();
+    if (parentNode != null)
+      return parentNode.getHierarchy(pDirection);
+    return pDirection == EDirection.RIGHT ? rightModify : leftModify;
+  }
+
   @NonNull
   @Override
   public AbstractPair getPair()
