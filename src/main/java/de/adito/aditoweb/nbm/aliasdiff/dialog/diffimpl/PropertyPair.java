@@ -321,11 +321,11 @@ public class PropertyPair extends AbstractPair
    */
   private boolean isDefaultOrNull(@NonNull IProperty<?, ?> pProperty)
   {
-    IHierarchy<?> rightHierarchy = ((BulkModifyHierarchy<?>) pProperty.getHierarchy()).getSourceHierarchy();
-    if (rightHierarchy instanceof DataModelHierarchy)
-      return DataModelHierarchy.isDefaultValue(Objects.requireNonNull(new PropertyPath(pProperty).find(rightHierarchy)));
+    IHierarchy<?> hierarchy = ((BulkModifyHierarchy<?>) pProperty.getHierarchy()).getSourceHierarchy();
+    if (hierarchy instanceof DataModelHierarchy)
+      return DataModelHierarchy.isDefaultValue(Objects.requireNonNull(new PropertyPath(pProperty).find(hierarchy)));
     else
-      return rightProperty.getValue() == null;
+      return pProperty.getValue() == null;
   }
 
   /**
