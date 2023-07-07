@@ -26,7 +26,7 @@ import org.openide.windows.WindowManager;
 import javax.swing.*;
 import javax.swing.tree.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.util.List;
 import java.util.*;
 import java.util.logging.Level;
@@ -68,7 +68,8 @@ public class DiffPresenter
     final String cancel = IButtonInscriptions.CANCEL;
     Object[] buttons = {ok, cancel};
 
-    final DialogDescriptor descriptor = new DialogDescriptor(new DiffPanel(pRoot, pUpdateHandler, pUserdefinedToolTip),
+    DiffPanel diffPanel = new DiffPanel(pRoot, pUpdateHandler, pUserdefinedToolTip);
+    final DialogDescriptor descriptor = new DialogDescriptor(diffPanel,
                                                              title, true, buttons, ok,
                                                              DialogDescriptor.BOTTOM_ALIGN, null, null);
     descriptor.setClosingOptions(new Object[]{});
@@ -104,7 +105,7 @@ public class DiffPresenter
           SwingUtilities.invokeLater(() -> {
             pRoot.write();
             if (pListener != null)
-              pListener.actionPerformed(null);
+              pListener.actionPerformed(new ActionEvent(diffPanel, -1, null));
             dlg.dispose();
           });
         }
