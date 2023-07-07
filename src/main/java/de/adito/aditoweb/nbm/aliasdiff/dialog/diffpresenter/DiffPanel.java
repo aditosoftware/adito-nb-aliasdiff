@@ -56,8 +56,8 @@ public class DiffPanel extends JComponent
 
   private transient IDiffNode mouseSelectedNode;
   private final transient NavigationHandler navigationHandler;
-  private final Action actionUpdateRight = new ActionUpdate(EDirection.RIGHT);
-  private final Action actionUpdateLeft = new ActionUpdate(EDirection.LEFT);
+  private final ActionUpdate actionUpdateRight = new ActionUpdate(EDirection.RIGHT);
+  private final ActionUpdate actionUpdateLeft = new ActionUpdate(EDirection.LEFT);
   private final Action actionRestore = new ActionRestore();
 
   private final RightHeader rightHeader;
@@ -124,6 +124,17 @@ public class DiffPanel extends JComponent
     actionMap.put(NEXT, actionNext);
 
     updateExpandCollapseState();
+  }
+
+  /**
+   * Determines, if the given side was changed by any user input
+   *
+   * @param pDirection Side to check
+   * @return true, if the given side was changed by user
+   */
+  public boolean isChangedByUser(@NonNull EDirection pDirection)
+  {
+    return pDirection == EDirection.RIGHT ? actionUpdateRight.isExecuted() : actionUpdateLeft.isExecuted();
   }
 
   /**
@@ -291,6 +302,9 @@ public class DiffPanel extends JComponent
     @NonNull
     private final EDirection direction;
 
+    @Getter
+    private boolean executed = false;
+
     @Override
     public boolean isEnabled()
     {
@@ -315,6 +329,7 @@ public class DiffPanel extends JComponent
 
           n.getPair().update(direction);
           TreeUtil.refresh(leftTree, n);
+          executed = true;
         }
       }
 

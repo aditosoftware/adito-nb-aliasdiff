@@ -4,7 +4,7 @@ import de.adito.aditoweb.designer.dataobjects.data.db.*;
 import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
-import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.DiffPresenter;
+import de.adito.aditoweb.nbm.aliasdiff.dialog.diffpresenter.*;
 import de.adito.aditoweb.nbm.aliasdiff.impl.db.IAliasConfigResolverProvider;
 import de.adito.aditoweb.nbm.aliasdiff.impl.entity.IEntityDBFactory;
 import de.adito.aditoweb.nbm.aliasdiff.impl.gui.*;
@@ -24,6 +24,7 @@ import org.netbeans.api.project.Project;
 import org.openide.util.*;
 import org.openide.util.lookup.ServiceProvider;
 
+import java.awt.event.ActionEvent;
 import java.util.*;
 
 /**
@@ -95,7 +96,8 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
       SaveUtil.saveUnsavedStates(null, true);
 
       // update model in database, if needed
-      executeUpdatesInDB(pAliasConfigResolver, rootNode, remoteSide);
+      if (hasRemoteSideChanged(e, remoteSide))
+        executeUpdatesInDB(pAliasConfigResolver, rootNode, remoteSide);
     }, new DiffDBToolTip());
   }
 
@@ -114,6 +116,23 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
         .filter(Objects::nonNull)
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("Missing project" + pDataObjects));
+  }
+
+  /**
+   * Determines, if the user did some changes on the remote side
+   *
+   * @param pEvent  Event that was given by the event listener
+   * @param pRemote Determines, on which side of the diff the remote model was
+   * @return true, if the remote side has changed or it could not be calculated (fallback)
+   */
+  private boolean hasRemoteSideChanged(@Nullable ActionEvent pEvent, @NonNull EDirection pRemote)
+  {
+    return Optional.ofNullable(pEvent)
+        .map(ActionEvent::getSource)
+        .filter(DiffPanel.class::isInstance)
+        .map(DiffPanel.class::cast)
+        .map(pPanel -> pPanel.isChangedByUser(pRemote))
+        .orElse(true);
   }
 
   /**
