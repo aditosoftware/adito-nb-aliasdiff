@@ -3,7 +3,7 @@ package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 import lombok.*;
 import org.openide.util.NbBundle;
 
-import java.util.Map;
+import java.util.*;
 
 /**
  * Type to specify, that a table should be updated
@@ -18,7 +18,7 @@ class TableUpdateInfo extends AbstractUpdateInfo
    */
   @Getter
   @Setter
-  private Map<String, ColumnUpdateInfo> columnUpdateInfos;
+  private Map<String, ColumnUpdateInfo> columnUpdateInfos = new HashMap<>();
 
   public TableUpdateInfo(@NonNull String pObjectName)
   {
