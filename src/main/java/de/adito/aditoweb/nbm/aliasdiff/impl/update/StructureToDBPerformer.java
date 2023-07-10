@@ -1,19 +1,14 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.update;
 
-import com.google.common.base.Strings;
 import de.adito.aditoweb.database.IAliasConfigInfo;
 import de.adito.aditoweb.database.general.metainfo.*;
-import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
-import de.adito.aditoweb.nbm.designer.commoninterface.dataobjects.IDesignerDataObject;
 import de.adito.aditoweb.nbm.designerdb.api.*;
 import de.adito.aditoweb.nbm.designerdb.impl.metadata.online.NBViewMetadata;
 import de.adito.aditoweb.nbm.entitydbeditor.dataobjects.*;
-import de.adito.aditoweb.system.crmcomponents.datamodels.aliasdefsubs.AliasDefDBDataModel;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.*;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
 import de.adito.aditoweb.system.crmcomponents.datatypes.EDatabaseType;
-import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasConfigDataModel;
 import de.adito.notification.INotificationFacade;
 import lombok.*;
 import org.jetbrains.annotations.Nullable;
@@ -24,6 +19,7 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import java.util.stream.*;
 
 /**
@@ -40,18 +36,18 @@ public class StructureToDBPerformer
    * Modified the database, that the given alias definition references, so that the database
    * has the same structure as the given alias definition afterwards.
    *
-   * @param pAliasConfigResolver Resolver, to get alias configs from
+   * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
    * @param pLocalAlias          Alias to perform the action
    * @throws Exception if something failed during update
    */
-  public static void perform(@NonNull IContextualAliasConfigResolver pAliasConfigResolver, @NonNull EntityGroupDBDataObject pLocalAlias) throws Exception
+  public static void perform(@NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier, @NonNull EntityGroupDBDataObject pLocalAlias) throws Exception
   {
     try
     {
       // Fire, that the alias definition is about to synchronize
       pLocalAlias.startSynchronizing();
 
-      AliasConfigDataModel aliasConfig = pAliasConfigResolver.getConfigForDefinitionName(getDefinitionName(pLocalAlias));
+      IAliasConfigInfo aliasConfig = pRemoteAliasSupplier.get();
       EntityGroupDBDataModel entityGroup = pLocalAlias.getPropertyPitProvider();
       if (entityGroup != null)
       {
@@ -77,32 +73,6 @@ public class StructureToDBPerformer
       // Fire, that the alias definition has completed synchronization
       pLocalAlias.finishSynchronizing();
     }
-  }
-
-  /**
-   * Returns the name, that should be used during database compare.
-   * Because of modularization, we need to look for the "targetAliasName" property.
-   *
-   * @param pDataObject DataObject, that should be read
-   * @return the name of the alias or null, if it can't be read
-   */
-  @Nullable
-  private static String getDefinitionName(@NonNull EntityGroupDBDataObject pDataObject)
-  {
-    // Search for the "targetAliasName" property
-    return Optional.ofNullable(pDataObject.getPropertyPitProvider())
-        .map(pGroupModel -> pGroupModel.getPit().getParent())
-        .filter(AliasDefDBDataModel.class::isInstance)
-        .map(pDefDBModel -> ((AliasDefDBDataModel) pDefDBModel).getPit().getValue(AliasDefDBDataModel.targetAliasName))
-        .map(Strings::emptyToNull)
-
-        // Read with the common "old" way
-        .or(() -> Optional.ofNullable(pDataObject.getParent())
-            .map(IDesignerDataObject::getParent)
-            .map(IDesignerDataObject::getName))
-
-        // Parent or property is not available -> we do not know, how to handel this anymore..
-        .orElse(null);
   }
 
   /**

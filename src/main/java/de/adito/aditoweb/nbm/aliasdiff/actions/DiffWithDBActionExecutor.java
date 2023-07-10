@@ -44,7 +44,7 @@ class DiffWithDBActionExecutor
     {
       // If only tables are selected, then diff the tables - otherwise diff the whole database
       if (containsOnlyTables(pActivatedNodes))
-        aliasDiffFacade.executeDatabaseDiffWithGUI(collectTables(pActivatedNodes));
+        aliasDiffFacade.executeDatabaseDiffWithGUI(groupDataObject, collectTables(pActivatedNodes));
       else
         aliasDiffFacade.executeDatabaseDiffWithGUI(groupDataObject);
     }
