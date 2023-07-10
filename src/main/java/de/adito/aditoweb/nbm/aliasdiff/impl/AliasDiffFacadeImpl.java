@@ -1,5 +1,7 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl;
 
+import com.google.common.base.Strings;
+import de.adito.aditoweb.database.IAliasConfigInfo;
 import de.adito.aditoweb.designer.dataobjects.data.db.*;
 import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
 import de.adito.aditoweb.nbm.aditonetbeansutil.misc.DataObjectUtil;
@@ -17,7 +19,7 @@ import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.*;
 import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasDefinitionDataModel;
 import de.adito.notification.INotificationFacade;
 import de.adito.propertly.core.spi.*;
-import lombok.NonNull;
+import lombok.*;
 import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.progress.*;
 import org.netbeans.api.project.Project;
@@ -26,6 +28,7 @@ import org.openide.util.lookup.ServiceProvider;
 
 import java.awt.event.ActionEvent;
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * GUI implementation of {@link IAliasDiffFacade}
@@ -39,20 +42,6 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
   private final IAliasConfigResolverProvider aliasConfigResolverProvider = Lookup.getDefault().lookup(IAliasConfigResolverProvider.class);
 
   @Override
-  public void executeDatabaseDiffWithGUI(@NonNull Set<IEntityDBDataObject<?>> pTableDataObjects)
-  {
-    if (pTableDataObjects.isEmpty())
-      return;
-
-    Project project = getProject(pTableDataObjects);
-    IContextualAliasConfigResolver resolver = aliasConfigResolverProvider.getResolver(project);
-    if (resolver == null)
-      return;
-
-    startDiff(project, resolver, DiffNodeCreatorFactory.forSomeTableDBDiff(entityDBFactory, resolver, pTableDataObjects), new DBUpdateHandler());
-  }
-
-  @Override
   public void executeDatabaseDiffWithGUI(@NonNull IEntityGroupDBDataObject pEntityGroup)
   {
     EntityGroupDBDataModel group = pEntityGroup.getProperty().getValue();
@@ -60,11 +49,25 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
       return;
 
     Project project = getProject(Set.of(pEntityGroup));
-    IContextualAliasConfigResolver resolver = aliasConfigResolverProvider.getResolver(project);
-    if (resolver == null)
+    RemoteAliasSupplier remoteAliasSupplier = RemoteAliasSupplier.create(project, aliasConfigResolverProvider, group);
+    if (remoteAliasSupplier == null)
       return;
 
-    startDiff(project, resolver, DiffNodeCreatorFactory.forWholeAliasDBDiff(entityDBFactory, resolver, group), new DBUpdateHandler());
+    startDiff(project, remoteAliasSupplier, DiffNodeCreatorFactory.forWholeAliasDBDiff(entityDBFactory, remoteAliasSupplier, group), new DBUpdateHandler());
+  }
+
+  @Override
+  public void executeDatabaseDiffWithGUI(@NonNull IEntityGroupDBDataObject pEntityGroup, @NonNull Set<IEntityDBDataObject<?>> pTableDataObjects)
+  {
+    if (pTableDataObjects.isEmpty())
+      return;
+
+    Project project = getProject(pTableDataObjects);
+    RemoteAliasSupplier remoteAliasSupplier = RemoteAliasSupplier.create(project, aliasConfigResolverProvider, pEntityGroup.getProperty().getValue());
+    if (remoteAliasSupplier == null)
+      return;
+
+    startDiff(project, remoteAliasSupplier, DiffNodeCreatorFactory.forSomeTableDBDiff(entityDBFactory, remoteAliasSupplier, pTableDataObjects), new DBUpdateHandler());
   }
 
   /**
@@ -73,11 +76,11 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
    * and then executes them when clicking OK.
    *
    * @param pProject             Project that was the origin of the diff event
-   * @param pAliasConfigResolver Resolver that allows the resolution of alias definition names during update phase after the dialog
+   * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
    * @param pOperation           Operation that returns a diff node to present in the dialog
    * @param pUpdateHandler       Update Handler that determines the actions, that are possible
    */
-  private void startDiff(@NonNull Project pProject, @NonNull IContextualAliasConfigResolver pAliasConfigResolver,
+  private void startDiff(@NonNull Project pProject, @NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier,
                          @NonNull ProgressRunnable<IDiffNode> pOperation, @NonNull IUpdateHandler pUpdateHandler)
   {
     IDiffNode rootNode = BaseProgressUtils.showProgressDialogAndRun(pOperation,
@@ -97,7 +100,7 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
 
       // update model in database, if needed
       if (hasRemoteSideChanged(e, remoteSide))
-        executeUpdatesInDB(pAliasConfigResolver, rootNode, remoteSide);
+        executeUpdatesInDB(pRemoteAliasSupplier, rootNode, remoteSide);
     }, new DiffDBToolTip());
   }
 
@@ -138,16 +141,16 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
   /**
    * Executes the updates, that the user did in the given {@link IDiffNode}, in the appropriate database
    *
-   * @param pAliasConfigResolver Resolver to get the alias config from
+   * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
    * @param pNode                Node to check for updates
    * @param pRemote              Determines, on which side of the diff the remote model was
    */
-  private void executeUpdatesInDB(@NonNull IContextualAliasConfigResolver pAliasConfigResolver, @NonNull IDiffNode pNode, @NonNull EDirection pRemote)
+  private void executeUpdatesInDB(@NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier, @NonNull IDiffNode pNode, @NonNull EDirection pRemote)
   {
     try
     {
       //noinspection unchecked
-      StructureToDBPerformer.perform(pAliasConfigResolver, Optional.ofNullable(pNode.getHierarchy(pRemote))
+      StructureToDBPerformer.perform(pRemoteAliasSupplier, Optional.ofNullable(pNode.getHierarchy(pRemote))
           .map(IHierarchy::getValue)
           .filter(AliasDefinitionDataModel.class::isInstance)
           .map(pModel -> ((AliasDefinitionDataModel) pModel).getAliasDefinitionSub())
@@ -159,6 +162,84 @@ public class AliasDiffFacadeImpl implements IAliasDiffFacade
     catch (Exception e)
     {
       INotificationFacade.INSTANCE.error(e);
+    }
+  }
+
+  /**
+   * Supplier to retrieve the {@link IAliasConfigInfo} for the appropriate remote alias to the given local alias
+   */
+  @RequiredArgsConstructor
+  private static class RemoteAliasSupplier implements Supplier<IAliasConfigInfo>
+  {
+    @NonNull
+    private final IContextualAliasConfigResolver resolver;
+
+    @NonNull
+    private final EntityGroupDBDataModel localAlias;
+
+    @Override
+    public IAliasConfigInfo get()
+    {
+      String definitionName = getDefinitionName(localAlias);
+
+      try
+      {
+        return resolver.getConfigForDefinitionName(definitionName);
+      }
+      catch (Exception e)
+      {
+        throw new IllegalStateException("Failed to read config for definition name " + definitionName, e);
+      }
+    }
+
+    /**
+     * Creates a new instance of {@link RemoteAliasSupplier}
+     *
+     * @param pProject                     Project to get the alias config resolver for
+     * @param pAliasConfigResolverProvider Provider to retrieve some {@link IContextualAliasConfigResolver}
+     * @param pLocalAlias                  Alias to get the matching remote one for
+     * @return the supplier to get the remote alias
+     */
+    @Nullable
+    public static RemoteAliasSupplier create(@Nullable Project pProject, @Nullable IAliasConfigResolverProvider pAliasConfigResolverProvider,
+                                             @Nullable EntityGroupDBDataModel pLocalAlias)
+    {
+      if (pProject == null || pAliasConfigResolverProvider == null || pLocalAlias == null)
+        return null;
+
+      IContextualAliasConfigResolver resolver = pAliasConfigResolverProvider.getResolver(pProject);
+      if (resolver == null)
+        return null;
+
+      return new RemoteAliasSupplier(resolver, pLocalAlias);
+    }
+
+    /**
+     * Returns the name, that should be used during database compare.
+     * Because of modularization, we need to look for the "targetAliasName" property.
+     *
+     * @param pModel Model, that should be read
+     * @return the name of the alias or null, if it can't be read
+     */
+    @Nullable
+    private String getDefinitionName(@NonNull EntityGroupDBDataModel pModel)
+    {
+      // Search for the "targetAliasName" property
+      //noinspection unchecked
+      return Optional.of(pModel)
+          .map(pGroupModel -> pGroupModel.getPit().getParent())
+          .filter(AliasDefDBDataModel.class::isInstance)
+          .map(pDefDBModel -> ((AliasDefDBDataModel) pDefDBModel).getPit().getValue(AliasDefDBDataModel.targetAliasName))
+          .map(Strings::emptyToNull)
+
+          // Read with the common "old" way
+          .or(() -> Optional.of(DataObjectUtil.get(pModel))
+              .map(IDesignerDataObject::getParent)
+              .map(IDesignerDataObject::getParent)
+              .map(IDesignerDataObject::getName))
+
+          // Parent or property is not available -> we do not know, how to handel this anymore..
+          .orElse(null);
     }
   }
 

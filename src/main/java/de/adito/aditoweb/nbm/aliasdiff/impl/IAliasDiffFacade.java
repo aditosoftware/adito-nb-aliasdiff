@@ -14,17 +14,18 @@ public interface IAliasDiffFacade
 {
 
   /**
-   * Executes the diff action on the given (remote) db tables
-   *
-   * @param pTableDataObjects tables that should be compared
-   */
-  void executeDatabaseDiffWithGUI(@NonNull Set<IEntityDBDataObject<?>> pTableDataObjects);
-
-  /**
    * Executes the diff action on the whole given alias
    *
    * @param pEntityGroup Group to extract all tables from
    */
   void executeDatabaseDiffWithGUI(@NonNull IEntityGroupDBDataObject pEntityGroup);
+
+  /**
+   * Executes the diff action on the given (remote) db tables
+   *
+   * @param pEntityGroup      Group to select the correct alias to diff
+   * @param pTableDataObjects tables that should be compared
+   */
+  void executeDatabaseDiffWithGUI(@NonNull IEntityGroupDBDataObject pEntityGroup, @NonNull Set<IEntityDBDataObject<?>> pTableDataObjects);
 
 }

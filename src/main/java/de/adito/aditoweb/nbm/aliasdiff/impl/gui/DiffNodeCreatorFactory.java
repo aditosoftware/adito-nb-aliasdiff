@@ -1,14 +1,13 @@
 package de.adito.aditoweb.nbm.aliasdiff.impl.gui;
 
+import de.adito.aditoweb.database.IAliasConfigInfo;
 import de.adito.aditoweb.database.general.metainfo.ITableMetadata;
 import de.adito.aditoweb.database.general.metainfo.providers.ITableMetadataProvider;
 import de.adito.aditoweb.designer.dataobjects.data.db.IEntityDBDataObject;
-import de.adito.aditoweb.filesystem.datamodelfs.misc.IContextualAliasConfigResolver;
 import de.adito.aditoweb.nbm.aliasdiff.dialog.*;
 import de.adito.aditoweb.nbm.aliasdiff.impl.entity.IEntityDBFactory;
 import de.adito.aditoweb.nbm.designer.commoninterface.dataobjects.IDesignerDataObject;
 import de.adito.aditoweb.system.crmcomponents.datamodels.entity.database.EntityGroupDBDataModel;
-import de.adito.aditoweb.system.crmcomponents.majordatamodels.AliasConfigDataModel;
 import de.adito.notification.INotificationFacade;
 import de.adito.propertly.core.spi.IProperty;
 import lombok.*;
@@ -16,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import org.netbeans.api.progress.*;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 /**
@@ -30,31 +30,31 @@ public class DiffNodeCreatorFactory
   /**
    * Creates a {@link ProgressRunnable} for a diff of a whole alias with a database
    *
-   * @param pFactory  Factory to create entity models from database
-   * @param pResolver Resolver to load alias configs
-   * @param pAlias    Local alias that should be compared
+   * @param pFactory             Factory to create entity models from database
+   * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
+   * @param pAlias               Local alias that should be compared
    * @return a {@link ProgressRunnable} containing the {@link IDiffNode}
    */
   @NonNull
-  public static ProgressRunnable<IDiffNode> forWholeAliasDBDiff(@NonNull IEntityDBFactory pFactory, @NonNull IContextualAliasConfigResolver pResolver,
+  public static ProgressRunnable<IDiffNode> forWholeAliasDBDiff(@NonNull IEntityDBFactory pFactory, @NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier,
                                                                 @NonNull EntityGroupDBDataModel pAlias)
   {
-    return new DBDiffNodeRunnableForWholeAlias(pFactory, pResolver, pAlias);
+    return new DBDiffNodeRunnableForWholeAlias(pFactory, pRemoteAliasSupplier, pAlias);
   }
 
   /**
    * Creates a {@link ProgressRunnable} for a diff of some tables with a database
    *
-   * @param pFactory  Factory to create entity models from database
-   * @param pResolver Resolver to load alias configs
-   * @param pTables   Set of tables that should be compared
+   * @param pFactory             Factory to create entity models from database
+   * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
+   * @param pTables              Set of tables that should be compared
    * @return a {@link ProgressRunnable} containing the {@link IDiffNode}
    */
   @NonNull
-  public static ProgressRunnable<IDiffNode> forSomeTableDBDiff(@NonNull IEntityDBFactory pFactory, @NonNull IContextualAliasConfigResolver pResolver,
+  public static ProgressRunnable<IDiffNode> forSomeTableDBDiff(@NonNull IEntityDBFactory pFactory, @NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier,
                                                                @NonNull Set<IEntityDBDataObject<?>> pTables)
   {
-    return new DBDiffNodeRunnableForSomeTables(pFactory, pResolver, pTables);
+    return new DBDiffNodeRunnableForSomeTables(pFactory, pRemoteAliasSupplier, pTables);
   }
 
   /**
@@ -160,23 +160,22 @@ public class DiffNodeCreatorFactory
     private final IEntityDBFactory entityFactory;
 
     @NonNull
-    private final IContextualAliasConfigResolver aliasConfigResolver;
+    private final Supplier<IAliasConfigInfo> remoteAliasSupplier;
 
     /**
      * Loads the equivalent of the passed alias from the database.
      * Can be narrowed down to specific tables if necessary
      *
-     * @param pLocalAlias Local alias definition
      * @param pTableNames Names of the tables to diff. NULL will diff every table in the given alias.
      * @return A newly created GroupDBModel with the contents of the tables
      * @throws Exception if an error occurred while loading the AliasConfig or creating the entity
      */
     @NonNull
-    protected EntityGroupDBDataModel resolveEntityGroupInDB(@NonNull EntityGroupDBDataModel pLocalAlias, @Nullable Set<String> pTableNames)
+    protected EntityGroupDBDataModel resolveEntityGroupInDB(@Nullable Set<String> pTableNames)
         throws Exception //NOSONAR generic exception handling is okay here..
     {
       // Read out which database we should read from and get the config
-      AliasConfigDataModel config = aliasConfigResolver.getConfigForDefinitionName(pLocalAlias.getPit().getHierarchy().getProperty().getName());
+      IAliasConfigInfo config = remoteAliasSupplier.get();
 
       // Read the entity from the DB and possibly filter it by table name
       if (pTableNames == null)
@@ -196,14 +195,14 @@ public class DiffNodeCreatorFactory
     /**
      * Creates the runnable based on a local alias definition
      *
-     * @param pFactory    Factory to create entity models from database
-     * @param pResolver   Resolver to load alias configs
-     * @param pGroupModel Local alias to diff
+     * @param pFactory             Factory to create entity models from database
+     * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
+     * @param pGroupModel          Local alias to diff
      */
-    public DBDiffNodeRunnableForWholeAlias(@NonNull IEntityDBFactory pFactory, @NonNull IContextualAliasConfigResolver pResolver,
+    public DBDiffNodeRunnableForWholeAlias(@NonNull IEntityDBFactory pFactory, @NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier,
                                            @NonNull EntityGroupDBDataModel pGroupModel)
     {
-      super(pFactory, pResolver);
+      super(pFactory, pRemoteAliasSupplier);
       groupModel = pGroupModel;
     }
 
@@ -211,7 +210,7 @@ public class DiffNodeCreatorFactory
     protected IDiffNode run0(@NonNull ProgressHandle pHandle) throws Exception
     {
       // Read model from database
-      EntityGroupDBDataModel extractedModel = resolveEntityGroupInDB(groupModel, null);
+      EntityGroupDBDataModel extractedModel = resolveEntityGroupInDB(null);
 
       // create the diff node from the extracted model
       return createDiffNode(groupModel, extractedModel, null, false);
@@ -229,14 +228,14 @@ public class DiffNodeCreatorFactory
     /**
      * Creates the runnable based on some db tables
      *
-     * @param pFactory  Factory to create entity models from database
-     * @param pResolver Resolver to load alias configs
-     * @param pTables   tables to diff
+     * @param pFactory             Factory to create entity models from database
+     * @param pRemoteAliasSupplier Supplier to retrieve the target remote alias
+     * @param pTables              tables to diff
      */
-    public DBDiffNodeRunnableForSomeTables(@NonNull IEntityDBFactory pFactory, @NonNull IContextualAliasConfigResolver pResolver,
+    public DBDiffNodeRunnableForSomeTables(@NonNull IEntityDBFactory pFactory, @NonNull Supplier<IAliasConfigInfo> pRemoteAliasSupplier,
                                            @NonNull Set<IEntityDBDataObject<?>> pTables)
     {
-      super(pFactory, pResolver);
+      super(pFactory, pRemoteAliasSupplier);
       tables = pTables;
     }
 
@@ -247,7 +246,7 @@ public class DiffNodeCreatorFactory
       Set<String> tableNames = getTableNames(tables);
 
       // Read model from database
-      EntityGroupDBDataModel extractedModel = resolveEntityGroupInDB(groupModel, tableNames);
+      EntityGroupDBDataModel extractedModel = resolveEntityGroupInDB(tableNames);
 
       // create the diff node from the extracted model
       return createDiffNode(groupModel, extractedModel, new TableNameFilter(tableNames), false);
