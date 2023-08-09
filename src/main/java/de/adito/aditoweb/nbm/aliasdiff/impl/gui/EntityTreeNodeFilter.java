@@ -6,7 +6,7 @@ import de.adito.aditoweb.system.crmcomponents.datamodels.entity.provider.IEntity
 import lombok.NonNull;
 
 import javax.swing.tree.MutableTreeNode;
-import java.util.ArrayList;
+import java.util.*;
 
 /**
  * Filters the "entities" and "entityFields" nodes out of the hierarchy and takes their children to the upper level.
@@ -37,6 +37,13 @@ class EntityTreeNodeFilter implements ITreeNodeFilter
     {
       for (int i = 0; i < pChild.getChildCount(); i++)
         list.add(new DiffFilterNode((MutableTreeNode) pChild.getChildAt(i), EntityTreeNodeFilter.this));
+
+      // Sort alphabetically, to improve readability
+      list.sort(Comparator.comparing(pNode -> {
+        if (pNode instanceof DiffFilterNode)
+          return ((DiffFilterNode) pNode).nameForDisplay(EDirection.LEFT);
+        return pNode.toString();
+      }, String.CASE_INSENSITIVE_ORDER));
     }
     else
       list.add(new DiffFilterNode(pChild, EntityTreeNodeFilter.this));
