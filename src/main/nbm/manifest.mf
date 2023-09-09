@@ -5,3 +5,10 @@ OpenIDE-Module-Display-Category: ADITO / Database
 OpenIDE-Module-Short-Description: This plugin provides experimental features to
  improve the comparing workflow of AliasDefinitions inside ADITO projects
 OpenIDE-Module-Install: de/adito/aditoweb/nbm/aliasdiff/AliasDiffModuleInstall.class
+OpenIDE-Module-Long-Description: This plugin provides experimental features to improve the comparing workflow of AliasDefinitions inside ADITO projects
+  <p style="font-weight: bold;">Changelog</p>
+   <p style="font-weight: bold;">v1.0.1</p>
+   <p style="margin-left: 10px; font-weight: bold;">MINOR</p>
+   <ul>
+     <li>Tables and columns inside diff dialog should be sorted alphabetically</li>
+   </ul>
